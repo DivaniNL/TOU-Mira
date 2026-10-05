@@ -18,7 +18,7 @@ public sealed class EclipsalBlindModifier(PlayerControl player) : DisabledModifi
     public override float Duration => OptionGroupSingleton<EclipsalOptions>.Instance.BlindDuration;
     public override bool AutoStart => true;
     public PlayerControl Eclipsal => player;
-    public GameObject? EclipseBack { get; set; }
+    public GameObject EclipseBack { get; set; }
     public override bool CanUseAbilities => true;
     public override bool CanReport => true;
 
@@ -43,7 +43,8 @@ public sealed class EclipsalBlindModifier(PlayerControl player) : DisabledModifi
         if (Player.AmOwner && !Eclipsal.AmOwner)
         {
             var notif1 = Helpers.CreateAndShowNotification(
-                $"<b>{TownOfUsColors.ImpSoft.ToTextColor()}You were blinded by an Eclipsal!</color></b>", Color.white,
+                $"<b>{TownOfUsColors.ImpSoft.ToTextColor()}{MiraLocaleManager.Get("TownOfUsMira.Modifier.EclipsalBlindedNotification")}</color></b>",
+                Color.white,
                 new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Eclipsal.LoadAsset());
 
             notif1.AdjustNotification();
@@ -81,13 +82,16 @@ public sealed class EclipsalBlindModifier(PlayerControl player) : DisabledModifi
             VisionPerc = 0f;
         }
 
-        EclipseBack?.SetActive(false);
+        if (!EclipseBack)
+        {
+            return;
+        }
+        EclipseBack.SetActive(false);
         if ((PlayerControl.LocalPlayer.IsImpostorAligned() || (PlayerControl.LocalPlayer.HasDied() &&
-                                                        OptionGroupSingleton<PostmortemOptions>.Instance.TheDeadKnow)) &&
-            EclipseBack?.gameObject != null)
+                                                        OptionGroupSingleton<PostmortemOptions>.Instance.TheDeadKnow)))
         {
             Player.cosmetics.currentBodySprite.BodySprite.material.SetColor(ShaderID.VisorColor, Color.black);
-            EclipseBack?.SetActive(!Player.IsVisibleToOthers());
+            EclipseBack.SetActive(!Player.IsVisibleToOthers());
         }
     }
 
@@ -103,9 +107,9 @@ public sealed class EclipsalBlindModifier(PlayerControl player) : DisabledModifi
             Player.cosmetics.currentBodySprite.BodySprite.material.SetColor(ShaderID.VisorColor, Palette.VisorColor);
         }
 
-        if (EclipseBack?.gameObject != null)
+        if (EclipseBack)
         {
-            EclipseBack.gameObject.Destroy();
+            EclipseBack.Destroy();
         }
     }
 }

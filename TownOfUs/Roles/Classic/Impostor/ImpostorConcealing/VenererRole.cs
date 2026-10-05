@@ -13,15 +13,12 @@ public sealed class VenererRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOfUs
 {
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<HunterRole>());
     public DoomableType DoomHintType => DoomableType.Trickster;
-    public string LocaleKey => "Venerer";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Venerer";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -31,6 +28,7 @@ public sealed class VenererRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOfUs
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Venerer.LoadAsset(), "TouMira.Role.Impostor.Venerer", 1.45f),
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
         Icon = TouRoleIcons.Venerer
     };
@@ -42,18 +40,18 @@ public sealed class VenererRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOfUs
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Camouflage", "Camouflage"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}CamouflageWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Camouflage", "Camouflage"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Camouflage.WikiDescription"),
                     TouImpAssets.CamouflageSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Sprint", "Sprint"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}SprintWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Sprint", "Sprint"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Sprint.WikiDescription"),
                     TouImpAssets.SprintSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Freeze", "Freeze"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}FreezeWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Freeze", "Freeze"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Freeze.WikiDescription"),
                     TouImpAssets.FreezeSprite)
-            };
+            ];
         }
     }
 

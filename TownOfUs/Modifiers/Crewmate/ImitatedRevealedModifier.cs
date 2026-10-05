@@ -3,6 +3,7 @@
 using AmongUs.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Roles;
+using MiraAPI.Utilities;
 using TownOfUs.Modules;
 using TownOfUs.Roles.Crewmate;
 using TownOfUs.Roles.Neutral;
@@ -55,9 +56,14 @@ public sealed class ImitatedRevealedModifier(RoleBehaviour role)
         {
             return;
         }
-        foreach (var voteArea in MeetingHud.Instance.playerStates)
+        var meeting = MeetingHud.Instance;
+        if (meeting == null)
         {
-            if (Player.PlayerId == voteArea.TargetPlayerId)
+            return;
+        }
+        foreach (var voteArea in meeting.playerStates)
+        {
+            if (Player.PlayerId == voteArea.PlayerId)
             {
                 Sprite? roleImg = null;
 
@@ -72,14 +78,15 @@ public sealed class ImitatedRevealedModifier(RoleBehaviour role)
 
                 if (roleImg != null)
                 {
-                    var newIcon = UnityEngine.Object.Instantiate(voteArea.GAIcon, voteArea.transform);
+                    var newIcon = UnityEngine.Object.Instantiate(voteArea.JudgeUsedLabel, voteArea.transform);
                     newIcon.gameObject.SetActive(true);
-                    newIcon.sprite = roleImg;
-                    newIcon.enabled = true;
+                    newIcon.transform.DestroyChildren();
+                    var spriteRend = newIcon.GetComponent<SpriteRenderer>();
+                    spriteRend.sprite = roleImg;
+                    spriteRend.enabled = true;
                     newIcon.name = "RoleIcon";
                     newIcon.SetSizeLimit(1.44f);
                     newIcon.transform.localPosition = new Vector3(-1.25f, -0.15f, -3f);
-                    // newIcon.transform.localPosition = new Vector3(-1.3f, 0f, -3f);
                     newIcon.transform.localScale = new Vector3(0.3f, 0.3f, 1f);
                 }
 

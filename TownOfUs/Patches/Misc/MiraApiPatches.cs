@@ -1,14 +1,15 @@
 using AmongUs.GameOptions;
 using MiraAPI.Patches.Freeplay;
 using HarmonyLib;
+using MiraAPI;
 using MiraAPI.Events;
 using MiraAPI.Events.Vanilla.Gameplay;
 using MiraAPI.Networking;
-using MiraAPI.Patches.Options;
 using MiraAPI.Roles;
 using MiraAPI.Utilities;
 using Reactor.Utilities;
 using TownOfUs.Networking;
+using UnityEngine;
 
 namespace TownOfUs.Patches.Misc;
 
@@ -20,20 +21,18 @@ public static class MiraApiPatches
     public static bool IsRoleBlacklisted(RoleBehaviour role, ref bool __result)
     {
         // Since TOU Engineer is just vanilla engineer with the fix mechanic, no need to have two engis around!
-        if (role.Role is RoleTypes.Engineer)
+        // Also Judge being a near carbon copy of Prosecutor is lame.
+        if (role.Role is RoleTypes.Engineer or RoleTypes.Judge)
         {
             __result = true;
             return false;
         }
-
-        if (MiscUtils.CurrentGamemode() is TouGamemode.HideAndSeek && (role.Role is RoleTypes.Detective ||
-                                                                       role.Role is RoleTypes.GuardianAngel ||
-                                                                       role.Role is RoleTypes.Noisemaker ||
-                                                                       role.Role is RoleTypes.Phantom ||
-                                                                       role.Role is RoleTypes.Scientist ||
-                                                                       role.Role is RoleTypes.Shapeshifter ||
-                                                                       role.Role is RoleTypes.Tracker ||
-                                                                       role.Role is RoleTypes.Viper))
+        if (MiscUtils.CurrentGamemode() is TouGamemode.HideAndSeek && (role.Role is not RoleTypes.Engineer and not RoleTypes.Impostor))
+        {
+            __result = true;
+            return false;
+        }
+        if (MiscUtils.CurrentGamemode() is not TouGamemode.Normal)
         {
             __result = true;
             return false;
@@ -44,25 +43,26 @@ public static class MiraApiPatches
     [HarmonyPrefix]
     public static bool NeutralTeamPrefix(ref string __result)
     {
-        __result = TouLocale.Get("NeutralKeyword").ToUpperInvariant();
+        __result = MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral").ToUpperInvariant();
         return false;
     }
     [HarmonyPatch(typeof(TaskAdderPatches), nameof(TaskAdderPatches.NeutralName), MethodType.Getter)]
     [HarmonyPrefix]
     public static bool NeutralNamePrefix(ref string __result)
     {
-        __result = TouLocale.Get("NeutralKeyword");
+        __result = MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral");
         return false;
     }
     [HarmonyPatch(typeof(TaskAdderPatches), nameof(TaskAdderPatches.ModifiersName), MethodType.Getter)]
     [HarmonyPrefix]
     public static bool ModifierNamePrefix(ref string __result)
     {
-        __result = TouLocale.Get("Modifiers");
+        __result = MiraLocaleManager.Get("Modifiers");
         return false;
     }
 
-    [HarmonyPatch(typeof(CustomMurderRpc), nameof(CustomMurderRpc.CustomMurder))]
+    [HarmonyPatch(typeof(CustomMurderRpc), nameof(CustomMurderRpc.CustomMurder), typeof(PlayerControl), typeof(PlayerControl), typeof(MurderResultFlags), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool))]
+    [HarmonyPatch(typeof(CustomMurderRpc), nameof(CustomMurderRpc.CustomMurder), typeof(PlayerControl), typeof(PlayerControl), typeof(PlayerControl), typeof(bool), typeof(bool), typeof(MurderResultFlags), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool))]
     [HarmonyPrefix]
     public static bool CustomMurderPatch(PlayerControl source)
     {
@@ -97,13 +97,15 @@ public static class MiraApiPatches
 
         var beforeMurderEvent = new BeforeMurderEvent(source, target, inMeeting);
         MiraEventManager.InvokeEvent(beforeMurderEvent);
-        var isMeetingActive = MeetingHud.Instance != null || ExileController.Instance != null;
+        var defenseFlag = beforeMurderEvent.IgnoreDefense;
+        var indirectFlag = beforeMurderEvent.IsIndirectAttack;
+        var isMeetingActive = MeetingHud.Instance || ExileController.Instance;
         if ((inMeeting is MeetingCheck.ForMeeting && !isMeetingActive) || (inMeeting is MeetingCheck.OutsideMeeting && isMeetingActive))
         {
             beforeMurderEvent.Cancel();
         }
 
-        if (target.ProtectedByGa())
+        if (!defenseFlag && target.ProtectedByGa())
         {
             beforeMurderEvent.Cancel();
             murderResultFlags = MurderResultFlags.FailedProtected;
@@ -134,6 +136,8 @@ public static class MiraApiPatches
             PlayerControl.LocalPlayer,
             source,
             target,
+            indirectFlag,
+            defenseFlag,
             murderResultFlags,
             resetKillTimer,
             createDeadBody,
@@ -143,7 +147,104 @@ public static class MiraApiPatches
         return false;
     }
 
-    [HarmonyPatch(typeof(CustomMurderRpc), nameof(CustomMurderRpc.RpcConfirmCustomMurder), typeof(PlayerControl), typeof(PlayerControl), typeof(PlayerControl), typeof(MurderResultFlags), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool))]
+    [HarmonyPatch(typeof(CustomMurderRpc), nameof(CustomMurderRpc.RpcConfirmAdvancedCustomMurder), typeof(PlayerControl), typeof(PlayerControl), typeof(PlayerControl), typeof(bool), typeof(bool), typeof(MurderResultFlags), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool))]
+    [HarmonyPrefix]
+    public static bool RpcConfirmAdvancedCustomMurderPatch(
+        this PlayerControl host,
+        PlayerControl source,
+        PlayerControl target,
+        bool isIndirect,
+        bool ignoreDefense,
+        MurderResultFlags murderResultFlags,
+        bool resetKillTimer = true,
+        bool createDeadBody = true,
+        bool teleportMurderer = true,
+        bool showKillAnim = true,
+        bool playKillSound = true)
+    {
+        if (LobbyBehaviour.Instance)
+        {
+            source.isKilling = false;
+            MiscUtils.RunAnticheatWarning(source);
+            return false;
+        }
+        if (!host.IsHost() || target.HasDied())
+        {
+            return false;
+        }
+
+        var murderResultFlags2 = MurderResultFlags.DecisionByHost | murderResultFlags;
+
+        source.CustomMurder(
+            target,
+            null,
+            isIndirect,
+            ignoreDefense,
+            murderResultFlags2,
+            resetKillTimer,
+            createDeadBody,
+            teleportMurderer,
+            showKillAnim,
+            playKillSound);
+
+        // Record kill cooldown change after CustomMurder if it was reset
+        if (CustomTouMurderRpcs.RecordedKillCooldown > -1f && resetKillTimer && source.AmOwner && source.Data?.Role?.CanUseKillButton == true)
+        {
+            Coroutines.Start(CustomTouMurderRpcs.CoRecordKillCooldownAfterCustomMurder(source, CustomTouMurderRpcs.RecordedKillCooldown));
+        }
+        return false;
+    }
+
+    [HarmonyPatch(typeof(CustomMurderRpc), nameof(CustomMurderRpc.RpcConfirmFramedCustomMurder), typeof(PlayerControl), typeof(PlayerControl), typeof(PlayerControl), typeof(PlayerControl), typeof(bool), typeof(bool), typeof(MurderResultFlags), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool))]
+    [HarmonyPrefix]
+    public static bool RpcConfirmFramedCustomMurderPatch(
+        this PlayerControl host,
+        PlayerControl source,
+        PlayerControl target,
+        PlayerControl framed,
+        bool isIndirect,
+        bool ignoreDefense,
+        MurderResultFlags murderResultFlags,
+        bool resetKillTimer = true,
+        bool createDeadBody = true,
+        bool teleportMurderer = true,
+        bool showKillAnim = true,
+        bool playKillSound = true)
+    {
+        if (LobbyBehaviour.Instance)
+        {
+            source.isKilling = false;
+            MiscUtils.RunAnticheatWarning(source);
+            return false;
+        }
+        if (!host.IsHost() || target.HasDied())
+        {
+            return false;
+        }
+
+        var murderResultFlags2 = MurderResultFlags.DecisionByHost | murderResultFlags;
+
+        source.CustomMurder(
+            target,
+            framed,
+            isIndirect,
+            ignoreDefense,
+            murderResultFlags2,
+            resetKillTimer,
+            createDeadBody,
+            teleportMurderer,
+            showKillAnim,
+            playKillSound);
+
+        // Record kill cooldown change after CustomMurder if it was reset
+        if (CustomTouMurderRpcs.RecordedKillCooldown > -1f && resetKillTimer && source.AmOwner && source.Data?.Role?.CanUseKillButton == true)
+        {
+            Coroutines.Start(CustomTouMurderRpcs.CoRecordKillCooldownAfterCustomMurder(source, CustomTouMurderRpcs.RecordedKillCooldown));
+        }
+        return false;
+    }
+
+    [HarmonyPatch(typeof(CustomMurderRpc), nameof(CustomMurderRpc.RpcConfirmCustomMurder), typeof(PlayerControl), typeof(PlayerControl), typeof(PlayerControl), typeof(bool), typeof(bool), typeof(MurderResultFlags), typeof(bool), typeof(bool), typeof(bool), typeof(bool), typeof(bool))]
     [HarmonyPrefix]
     public static bool RpcConfirmCustomMurderPatch(
         this PlayerControl host,
@@ -186,16 +287,6 @@ public static class MiraApiPatches
         return false;
     }
 
-    [HarmonyPatch(typeof(RoleSettingMenuPatches), nameof(RoleSettingMenuPatches.ClosePatch))]
-    [HarmonyPrefix]
-#pragma warning disable S3400
-    public static bool MiraClosePatch()
-#pragma warning restore S3400
-    {
-        // Patching this for now
-        return false;
-    }
-
     [HarmonyPatch(typeof(GameSettingMenu), nameof(GameSettingMenu.Start))]
     [HarmonyPostfix]
     public static void OpenPatch()
@@ -208,5 +299,70 @@ public static class MiraApiPatches
     public static void ClosePatch()
     {
         HudManager.Instance.PlayerCam.OverrideScreenShakeEnabled = true;
+    }
+
+    [HarmonyPatch(typeof(HowToPlayScene), nameof(HowToPlayScene.OpenRolesSelectionMenu))]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    public static bool HowToPlayPrefix(HowToPlayScene __instance)
+    {
+        if (MiraApiPlugin.IsDevBuild)
+        {
+            // This is simply a fix for public release, no api update needed.
+            return true;
+        }
+
+        __instance.sceneIndex = 0;
+        __instance.category = HowToPlayScene.HowToPlayCategory.RolesSelection;
+        __instance.startPage.SetActive(false);
+        if (__instance.roleButtonsParent.childCount == 0)
+        {
+            foreach (var role in RoleManager.Instance.AllRoles.ToArray().Where(x => !x.IsCustomRole()))
+            {
+                if (!role.IsSimpleRole && role.Role != RoleTypes.CrewmateGhost && role.Role != RoleTypes.ImpostorGhost)
+                {
+                    HowToPlayRoleButton component = UnityEngine.Object
+                        .Instantiate(__instance.roleButtonPrefab, __instance.roleButtonsParent)
+                        .GetComponent<HowToPlayRoleButton>();
+                    Sprite roleIcon = __instance.rolesScenes.ToArray().First(r => r.role == role.Role).roleIcon;
+                    component.SetRoleInfo(role, roleIcon);
+                    component.SetButtonAction((Il2CppSystem.Action)(() => { OpenRolePage(__instance, role.Role); }));
+                    __instance.controllerSelectables.Add(component.GetComponent<PassiveButton>());
+                }
+            }
+
+            foreach (UiElement uiElement in __instance.controllerSelectables)
+            {
+                uiElement.ReceiveMouseOut();
+            }
+
+            ControllerManager.Instance.NewScene(__instance.name, __instance.closeButton,
+                __instance.defaultButtonSelected, __instance.controllerSelectables, false);
+        }
+
+        __instance.DisableAllScenes();
+        __instance.roleSelectionScene.SetActive(true);
+        ControllerManager.Instance.SetDefaultSelection(__instance.defaultButtonSelected, null);
+        return false;
+    }
+
+    public static void OpenRolePage(HowToPlayScene instance, RoleTypes roleType)
+    {
+        instance.category = HowToPlayScene.HowToPlayCategory.Roles;
+        var newList = instance.rolesScenes.ToArray().ToList();
+        var buttonList = instance.roleButtons;
+        instance.sceneIndex = newList.FindIndex(r => r.role == roleType);
+        if (roleType != RoleTypes.Crewmate)
+        {
+            foreach (var button in buttonList)
+            {
+                if (button.GetRole().Role == roleType)
+                {
+                    instance.previouslySelectedRoleButton = button.GetComponent<PassiveButton>();
+                }
+            }
+        }
+        instance.SetupDots(instance.rolesScenes[instance.sceneIndex].rolePages.Count);
+        instance.ChangeScene(0);
     }
 }

@@ -6,7 +6,6 @@ using MiraAPI.Events.Vanilla.Meeting;
 using MiraAPI.GameOptions;
 using MiraAPI.Hud;
 using MiraAPI.Modifiers;
-using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Crewmate;
 using TownOfUs.Options;
 using TownOfUs.Roles.Crewmate;
@@ -16,13 +15,13 @@ namespace TownOfUs.Events.Crewmate;
 public static class ClericEvents
 {
     [RegisterEvent]
-    public static void EjectionEventEventHandler(EjectionEvent @event)
+    public static void EjectionEventEventHandler(EjectionEvent _)
     {
         ModifierUtils.GetPlayersWithModifier<ClericCleanseModifier>()
             .Do(x => x.RemoveModifier<ClericCleanseModifier>());
     }
 
-    [RegisterEvent]
+    [RegisterEvent(-800)]
     public static void MiraButtonClickEventHandler(MiraButtonClickEvent @event)
     {
         var button = @event.Button as CustomActionButton<PlayerControl>;
@@ -36,7 +35,7 @@ public static class ClericEvents
         CheckForClericBarrier(@event, target, PlayerControl.LocalPlayer);
     }
 
-    [RegisterEvent]
+    [RegisterEvent(-800)]
     public static void MiraButtonCancelledEventHandler(MiraButtonCancelledEvent @event)
     {
         var source = PlayerControl.LocalPlayer;
@@ -51,7 +50,7 @@ public static class ClericEvents
         ResetButtonTimer(source, button);
     }
 
-    [RegisterEvent]
+    [RegisterEvent(-800)]
     public static void BeforeMurderEventHandler(BeforeMurderEvent @event)
     {
         var source = @event.Source;
@@ -73,7 +72,8 @@ public static class ClericEvents
 
         if (!target.HasModifier<ClericBarrierModifier>() ||
             target.PlayerId == source.PlayerId ||
-            (source.TryGetModifier<IndirectAttackerModifier>(out var indirect) && indirect.IgnoreShield))
+            @event is BeforeMurderEvent { IgnoreDefense: true } ||
+            @event is ExtendedMiraButtonClickEvent { IgnoreDefense: true })
         {
             return false;
         }

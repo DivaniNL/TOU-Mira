@@ -2,8 +2,6 @@ using Hazel;
 using Il2CppInterop.Runtime.Injection;
 using MiraAPI.Roles;
 using Reactor.Utilities.Attributes;
-using TownOfUs.Events;
-using TownOfUs.Modifiers;
 using TownOfUs.Roles.Impostor;
 
 namespace TownOfUs.Modules.Components;
@@ -12,10 +10,11 @@ namespace TownOfUs.Modules.Components;
 public sealed class HexBombSabotageSystem(nint cppPtr) : Il2CppSystem.Object(cppPtr)
 {
     public const byte SabotageId = 150;
+    public const SystemTypes SystemType = (SystemTypes)SabotageId;
     public readonly float duration;
 
     public bool IsActive => (TimeRemaining > 0 || Stage == HexBombStage.Finished);
-    public static bool InMeeting => MeetingHud.Instance != null || ExileController.Instance != null;
+    public static bool InMeeting => MeetingHud.Instance || ExileController.Instance;
     public bool IsDirty { get; private set; }
     public float TimeRemaining { get; private set; }
     public HexBombStage Stage { get; private set; }
@@ -86,9 +85,10 @@ public sealed class HexBombSabotageSystem(nint cppPtr) : Il2CppSystem.Object(cpp
                     foreach (var player in PlayerControl.AllPlayerControls.ToArray()
                                  .Where(x => !x.HasDied() && !x.IsImpostorAligned()))
                     {
-                        DeathHandlerModifier.UpdateDeathHandlerImmediate(player, TouLocale.Get("DiedToSpellslingerHexBomb"), DeathEventHandlers.CurrentRound, DeathHandlerOverride.SetTrue,
-                            TouLocale.GetParsed("DiedByStringBasic").Replace("<player>", spellslinger.Player.Data.PlayerName),
-                            lockInfo: DeathHandlerOverride.SetTrue);
+                        GameHistory.UpdatePlayerDeathData(player, MiraLocaleManager.Get("DiedToSpellslingerHexBomb"), 0, HudManagerHelper.Instance.CurrentRound,
+                            DeathHandlerOverride.SetTrue,
+                            MiraLocaleManager.Get("DiedByStringBasic").Replace("<player>", spellslinger.Player.Data.PlayerName),
+                            lockInfo: DeathHandlerOverride.SetTrue, playerState: StoredPlayerState.Dead);
                     }
                 }
                 TimeRemaining = 7f;

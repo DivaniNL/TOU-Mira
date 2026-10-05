@@ -10,6 +10,7 @@ using MiraAPI.Roles;
 using Reactor.Utilities;
 using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Game.Alliance;
+using TownOfUs.Modifiers.Game.Assailant;
 using TownOfUs.Modifiers.Impostor;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Crewmate;
@@ -25,9 +26,15 @@ public sealed class ScavengerRole(IntPtr cppPtr)
     [HideFromIl2Cpp] public PlayerControl? Target { get; set; }
     public bool Scavenging { get; set; }
 
+    [HideFromIl2Cpp]
+    public bool IsModifierApplicable(BaseModifier modifier)
+    {
+        return modifier is not OverclockerModifier;
+    }
+
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data.Role is not ScavengerRole)
+        if (!Player || Player.Data.Role is not ScavengerRole)
         {
             return;
         }
@@ -71,7 +78,7 @@ public sealed class ScavengerRole(IntPtr cppPtr)
                     x => !x.HasModifier<FirstDeadShield>() && !x.HasModifier<LoverModifier>())!;
             }
 
-            Target.AddModifier<ScavengerArrowModifier>(Player, TownOfUsColors.Impostor);
+            Target?.AddModifier<ScavengerArrowModifier>(Player, TownOfUsColors.Impostor);
         }
 
         if (TimeRemaining > 0)
@@ -90,15 +97,12 @@ public sealed class ScavengerRole(IntPtr cppPtr)
 
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<InvestigatorRole>());
     public DoomableType DoomHintType => DoomableType.Hunter;
-    public string LocaleKey => "Scavenger";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Scavenger";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -108,6 +112,7 @@ public sealed class ScavengerRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Scavenger.LoadAsset(), "TouMira.Role.Impostor.Scavenger", 1.45f),
         Icon = TouRoleIcons.Scavenger,
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
         IntroSound = TouAudio.WarlockIntroSound
@@ -136,13 +141,13 @@ public sealed class ScavengerRole(IntPtr cppPtr)
         Clear();
     }
 
-    public static string TimerString = TouLocale.GetParsed("TouRoleScavengerTabTimer");
-    public static string TargetString = TouLocale.GetParsed("TouRoleScavengerTabTarget");
+    public static string TimerString = MiraLocaleManager.Get("TownOfUsMira.Role.ScavengerTabTimer");
+    public static string TargetString = MiraLocaleManager.Get("TownOfUsMira.Role.ScavengerTabTarget");
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        TimerString = TouLocale.GetParsed("TouRoleScavengerTabTimer");
-        TargetString = TouLocale.GetParsed("TouRoleScavengerTabTarget");
+        TimerString = MiraLocaleManager.Get("TownOfUsMira.Role.ScavengerTabTimer");
+        TargetString = MiraLocaleManager.Get("TownOfUsMira.Role.ScavengerTabTarget");
         if (TutorialManager.InstanceExists && Target == null && Player.AmOwner)
         {
             Coroutines.Start(SetTutorialTarget(this, Player));
@@ -169,7 +174,7 @@ public sealed class ScavengerRole(IntPtr cppPtr)
                     x => !x.HasModifier<FirstDeadShield>() && !x.HasModifier<LoverModifier>())!;
             }
 
-            scav.Target.AddModifier<ScavengerArrowModifier>(player, TownOfUsColors.Impostor);
+            scav.Target?.AddModifier<ScavengerArrowModifier>(player, TownOfUsColors.Impostor);
         }
     }
 
@@ -219,7 +224,7 @@ public sealed class ScavengerRole(IntPtr cppPtr)
             }
 
             // update arrow to point to new target
-            Target.AddModifier<ScavengerArrowModifier>(Player, TownOfUsColors.Impostor);
+            Target?.AddModifier<ScavengerArrowModifier>(Player, TownOfUsColors.Impostor);
         }
         else
         {

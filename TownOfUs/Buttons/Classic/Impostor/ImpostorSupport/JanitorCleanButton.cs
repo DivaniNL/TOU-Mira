@@ -1,6 +1,5 @@
 using MiraAPI.GameOptions;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Impostor;
 using UnityEngine;
@@ -8,15 +7,15 @@ using UnityEngine;
 namespace TownOfUs.Buttons.Impostor;
 
 public sealed class JanitorCleanButton : TownOfUsKillRoleButton<JanitorRole, DeadBody>, IAftermathableBodyButton,
-    IDiseaseableButton
+    IDiseaseableButton, ILegacyCapable
 {
-    public override string Name => TouLocale.GetParsed("TouRoleJanitorClean", "Clean");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.JanitorClean", "Clean");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Impostor;
     public override float Cooldown => Math.Clamp(OptionGroupSingleton<JanitorOptions>.Instance.CleanCooldown + MapCooldown, 5f, 120f);
     public override float EffectDuration => OptionGroupSingleton<JanitorOptions>.Instance.CleanDelay + 0.001f;
     public override int MaxUses => (int)OptionGroupSingleton<JanitorOptions>.Instance.MaxClean;
-    public override LoadableAsset<Sprite> Sprite => TouImpAssets.CleanButtonSprite;
+    public override LoadableAsset<Sprite> Sprite => LegacyAssets.IsLegacy ? LegacyImpAssets.CleanButtonSprite : TouImpAssets.CleanButtonSprite;
 
     public DeadBody? CleaningBody { get; set; }
 
@@ -50,12 +49,28 @@ public sealed class JanitorCleanButton : TownOfUsKillRoleButton<JanitorRole, Dea
         }
 
         CleaningBody = Target;
-        OverrideName(TouLocale.Get("TouRoleJanitorCleaning", "Cleaning"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.JanitorCleaning", "Cleaning"));
+    }
+
+    public void CheckReset(bool resetSelf)
+    {
+        var opts = OptionGroupSingleton<JanitorOptions>.Instance.CooldownSync;
+        if (opts == JanitorCooldownSync.Always || opts == JanitorCooldownSync.WithTeammates && MiscUtils.ImpAliveCount > 1)
+        {
+            if (resetSelf)
+            {
+                ResetCooldownAndOrEffect();
+            }
+            else
+            {
+                PlayerControl.LocalPlayer.SetKillTimer(PlayerControl.LocalPlayer.GetKillCooldown());
+            }
+        }
     }
 
     public override void OnEffectEnd()
     {
-        OverrideName(TouLocale.Get("TouRoleJanitorClean", "Clean"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.JanitorClean", "Clean"));
         if (CleaningBody == Target && CleaningBody != null)
         {
             JanitorRole.RpcCleanBody(PlayerControl.LocalPlayer, CleaningBody.ParentId);
@@ -63,9 +78,6 @@ public sealed class JanitorCleanButton : TownOfUsKillRoleButton<JanitorRole, Dea
         }
 
         CleaningBody = null;
-        if (OptionGroupSingleton<JanitorOptions>.Instance.ResetCooldowns)
-        {
-            PlayerControl.LocalPlayer.SetKillTimer(PlayerControl.LocalPlayer.GetKillCooldown());
-        }
+        CheckReset(false);
     }
 }

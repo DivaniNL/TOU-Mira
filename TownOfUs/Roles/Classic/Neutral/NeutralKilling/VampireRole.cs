@@ -5,11 +5,11 @@ using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
-using MiraAPI.Utilities;
 using Reactor.Networking.Attributes;
 using TownOfUs.Events.TouEvents;
+using TownOfUs.Interfaces;
 using TownOfUs.Modifiers;
-using TownOfUs.Modifiers.Game.Neutral;
+using TownOfUs.Modifiers.Game.Assailant;
 using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Options.Roles.Neutral;
 using TownOfUs.Roles.Crewmate;
@@ -17,32 +17,31 @@ using UnityEngine;
 
 namespace TownOfUs.Roles.Neutral;
 
-public sealed class VampireRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable, ICrewVariant
+public sealed class VampireRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable, ICrewVariant, IDoubleDraftRole
 {
     public override void SpawnTaskHeader(PlayerControl playerControl)
     {
-        if (playerControl != PlayerControl.LocalPlayer)
+        if (!playerControl.AmOwner)
         {
             return;
         }
         ImportantTextTask orCreateTask = PlayerTask.GetOrCreateTask<ImportantTextTask>(playerControl, 0);
-        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{TouLocale.GetParsed("NeutralKillingTaskHeader")}</color>";
+        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{MiraLocaleManager.Get("NeutralKillingTaskHeader")}</color>";
         orCreateTask.name = "NeutralRoleText";
     }
 
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<SeerRole>());
     public DoomableType DoomHintType => DoomableType.Death;
-    public string YouAreText => TouLocale.Get("YouAreA");
-    public string YouWereText => TouLocale.Get("YouWereA");
-    public string LocaleKey => "Vampire";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string YouAreText => MiraLocaleManager.Get("YouAreA");
+    public string YouWereText => MiraLocaleManager.Get("YouWereA");
+    public string IdPart => "Vampire";
+    public string RoleMedDescriptionLocale => $"TownOfUsMira.Role.{IdPart}.TabDescription";
+    public bool IsDoubleDraftRole => true;
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -51,12 +50,12 @@ public sealed class VampireRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsR
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Bite", "Bite"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}BiteWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Bite", "Bite"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Bite.WikiDescription"),
                     TouNeutAssets.BiteSprite)
-            };
+            ];
         }
     }
 
@@ -68,6 +67,7 @@ public sealed class VampireRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsR
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Vampire.LoadAsset(), "TouMira.Role.Neutral.Vampire", 1.45f),
         CanUseVent = OptionGroupSingleton<VampireOptions>.Instance.CanVent,
         IntroSound = TouAudio.VampIntroSound,
         OptionsScreenshot = TouBanners.NeutralRoleBanner,
@@ -82,18 +82,18 @@ public sealed class VampireRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsR
     {
         var vampireCount = CustomRoleUtils.GetActiveRolesOfType<VampireRole>().Count(x => !x.Player.HasDied());
 
-        if (MiscUtils.KillersAliveCount > vampireCount)
+        if (MiscUtils.KillersAliveCount > vampireCount || MiscUtils.KillersAliveCount == 0)
         {
             return false;
         }
 
-        return vampireCount >= Helpers.GetAlivePlayers().Count - vampireCount;
+        return vampireCount >= MiscUtils.GetImpactfulLivingPlayers().Count - vampireCount;
     }
 
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        if (Player.AmOwner)
+        if (Player.AmOwner && !LegacyAssets.IsLegacy)
         {
             HudManager.Instance.ImpostorVentButton.graphic.sprite = TouNeutAssets.VampVentSprite.LoadAsset();
             HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Vampire);
@@ -109,7 +109,7 @@ public sealed class VampireRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsR
     {
         RoleBehaviourStubs.Deinitialize(this, targetPlayer);
         TouRoleUtils.ClearTaskHeader(Player);
-        if (Player.AmOwner)
+        if (Player.AmOwner && !LegacyAssets.IsLegacy)
         {
             HudManager.Instance.ImpostorVentButton.graphic.sprite = TouAssets.VentSprite.LoadAsset();
             HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Impostor);
@@ -154,7 +154,7 @@ public sealed class VampireRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsR
 
         if (OptionGroupSingleton<VampireOptions>.Instance.CanGuessAsNewVamp)
         {
-            target.AddModifier<NeutralKillerAssassinModifier>();
+            target.AddModifier<AssassinModifier>();
         }
     }
 }

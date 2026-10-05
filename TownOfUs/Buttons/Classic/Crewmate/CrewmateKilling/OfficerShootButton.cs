@@ -4,10 +4,9 @@ using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Networking;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities;
-using TownOfUs.Events;
 using TownOfUs.Modifiers;
+using TownOfUs.Modifiers.Crewmate;
 using TownOfUs.Modifiers.Game;
 using TownOfUs.Modules;
 using TownOfUs.Options.Modifiers.Alliance;
@@ -18,13 +17,13 @@ using UnityEngine;
 
 namespace TownOfUs.Buttons.Crewmate;
 
-public sealed class OfficerShootButton : TownOfUsKillRoleButton<OfficerRole, PlayerControl>, IKillButton
+public sealed class OfficerShootButton : TownOfUsKillRoleButton<OfficerRole, PlayerControl>, IKillButton, ILegacyCapable
 {
-    public override string Name => TouLocale.GetParsed("TouRoleOfficerShoot", "Shoot");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.OfficerShoot", "Shoot");
     public override BaseKeybind Keybind => Keybinds.PrimaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Officer;
     public override float Cooldown => Math.Clamp(OptionGroupSingleton<OfficerOptions>.Instance.ShootCooldown.Value + MapCooldown, 5f, 120f);
-    public override LoadableAsset<Sprite> Sprite => TouCrewAssets.OfficerShootSprite;
+    public override LoadableAsset<Sprite> Sprite => LegacyAssets.IsLegacy ? LegacyVanillaAssets.KillSprite : TouCrewAssets.OfficerShootSprite;
 
     public override bool ZeroIsInfinite { get; set; } = true;
 
@@ -32,14 +31,12 @@ public sealed class OfficerShootButton : TownOfUsKillRoleButton<OfficerRole, Pla
     public bool FailedShot => RoundsBeforeReset > 0;
     public int TotalBullets { get; set; } = -1;
     public int LoadedBullets { get; set; }
-
-    public static bool Usable =>
-        OptionGroupSingleton<OfficerOptions>.Instance.FirstRoundShooting || TutorialManager.InstanceExists || DeathEventHandlers.CurrentRound > 1;
+    public override bool UsableFirstRound => OptionGroupSingleton<OfficerOptions>.Instance.FirstRoundShooting;
     public static int MaxLoadedBullets => (int)OptionGroupSingleton<OfficerOptions>.Instance.MaxBulletsAtOnce;
 
     public override bool CanUse()
     {
-        return base.CanUse() && Usable && !FailedShot && LoadedBullets > 0;
+        return base.CanUse() && !FailedShot && LoadedBullets > 0;
     }
 
     public void UpdateUses()
@@ -66,7 +63,7 @@ public sealed class OfficerShootButton : TownOfUsKillRoleButton<OfficerRole, Pla
         OfficerRole.RpcOfficerMisfire(PlayerControl.LocalPlayer);
         PlayerControl.LocalPlayer.RpcCustomMurder(Target, MeetingCheck.OutsideMeeting);
 
-        var notif1 = Helpers.CreateAndShowNotification($"<b>{TouLocale.GetParsed("TouRoleOfficerBadKillFeedback")}</b>",
+        var notif1 = Helpers.CreateAndShowNotification($"<b>{MiraLocaleManager.Get("TownOfUsMira.Role.OfficerBadKillFeedback")}</b>",
             Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Officer.LoadAsset());
 
         notif1.AdjustNotification();
@@ -125,6 +122,15 @@ public sealed class OfficerShootButton : TownOfUsKillRoleButton<OfficerRole, Pla
                         (stats.CorrectAssassinKills > 0 || stats.CorrectKills > 0 || stats.IncorrectKills > 0) ||
                         GameHistory.KilledPlayers.Any(x =>
                             x.KillerId == Target.PlayerId && x.VictimId != Target.PlayerId);
+
+        var targetRole = Target.Data.Role;
+        var hasProsecuted = targetRole is ProsecutorRole pros && pros.ProsecutionsCompleted > 0;
+
+        // Prosecutor Imitator *technically* already completed their prosecutes
+        if (hasProsecuted && !Target.HasModifier<ImitatorCacheModifier>())
+        {
+            hasKilled = true;
+        }
         var evilOfficer = (PlayerControl.LocalPlayer.TryGetModifier<AllianceGameModifier>(out var allyMod) &&
                             !allyMod.GetsPunished);
 

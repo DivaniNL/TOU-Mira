@@ -2,7 +2,6 @@ using HarmonyLib;
 using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Options.Roles.Neutral;
 using TownOfUs.Roles.Neutral;
@@ -12,7 +11,7 @@ namespace TownOfUs.Buttons.Neutral;
 
 public sealed class InquisitorInquireButton : TownOfUsRoleButton<InquisitorRole, PlayerControl>
 {
-    public override string Name => TouLocale.GetParsed("TouRoleInquisitorInquire", "Inquire");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.InquisitorInquire", "Inquire");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override int MaxUses => (int)OptionGroupSingleton<InquisitorOptions>.Instance.MaxUses;
     public override Color TextOutlineColor => TownOfUsColors.Inquisitor;
@@ -52,7 +51,7 @@ public sealed class InquisitorInquireButton : TownOfUsRoleButton<InquisitorRole,
         Target.AddModifier<InquisitorInquiredModifier>();
 
         var notif1 = Helpers.CreateAndShowNotification(
-            TouLocale.GetParsed("TouRoleInquisitorInquireNotif").Replace("<player>", $"{TownOfUsColors.Inquisitor.ToTextColor()}{Target.Data.PlayerName}</color>"),
+            MiraLocaleManager.Get("TownOfUsMira.Role.InquisitorInquireNotif").Replace("<player>", $"{TownOfUsColors.Inquisitor.ToTextColor()}{Target.Data.PlayerName}</color>"),
             Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Inquisitor.LoadAsset());
 
         notif1.AdjustNotification();

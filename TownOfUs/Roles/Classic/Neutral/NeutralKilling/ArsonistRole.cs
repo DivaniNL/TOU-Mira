@@ -6,7 +6,6 @@ using MiraAPI.Hud;
 using MiraAPI.Modifiers;
 using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
-using MiraAPI.Utilities;
 using Reactor.Utilities;
 using TownOfUs.Buttons.Neutral;
 using TownOfUs.Modifiers.Neutral;
@@ -20,43 +19,41 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
 {
     public override void SpawnTaskHeader(PlayerControl playerControl)
     {
-        if (playerControl != PlayerControl.LocalPlayer)
+        if (!playerControl.AmOwner)
         {
             return;
         }
         ImportantTextTask orCreateTask = PlayerTask.GetOrCreateTask<ImportantTextTask>(playerControl, 0);
         orCreateTask.Text =
-            $"{TownOfUsColors.Neutral.ToTextColor()}{TouLocale.GetParsed("NeutralKillingTaskHeader")}</color>";
+            $"{TownOfUsColors.Neutral.ToTextColor()}{MiraLocaleManager.Get("NeutralKillingTaskHeader")}</color>";
         orCreateTask.name = "NeutralRoleText";
     }
 
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<ClericRole>());
     public DoomableType DoomHintType => DoomableType.Fearmonger;
-    public string LocaleKey => "Arsonist";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
+    public string IdPart => "Arsonist";
     public static void SetDouseUses()
     {
         var button = CustomButtonSingleton<ArsonistDouseButton>.Instance;
         if (button.LimitedUses)
         {
             var dousedCount = ModifierUtils.GetPlayersWithModifier<ArsonistDousedModifier>().Count(x => !x.HasDied());
-            var newUses = Math.Clamp(0, button.MaxUses - dousedCount, button.MaxUses);
+            var newUses = Math.Clamp(button.MaxUses - dousedCount, 0, button.MaxUses);
             button.SetUses(newUses);
         }
     }
 
     public string RoleLongDescription => OptionGroupSingleton<ArsonistOptions>.Instance.LegacyArsonist
-        ? TouLocale.GetParsed($"TouRole{LocaleKey}TabDescriptionLegacy")
-        : TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+        ? MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.TabDescriptionLegacy")
+        : MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.TabDescription");
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
-            TouLocale.GetParsed(OptionGroupSingleton<ArsonistOptions>.Instance.LegacyArsonist
-                ? $"TouRole{LocaleKey}WikiAdditionLegacy"
-                : $"TouRole{LocaleKey}WikiAddition") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
+            MiraLocaleManager.Get(OptionGroupSingleton<ArsonistOptions>.Instance.LegacyArsonist
+                ? $"TownOfUsMira.Role.{IdPart}WikiAdditionLegacy"
+                : $"TownOfUsMira.Role.{IdPart}WikiAddition") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -65,17 +62,17 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Douse", "Douse"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}DouseWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Douse", "Douse"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Douse.WikiDescription"),
                     TouNeutAssets.DouseButtonSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Ignite", "Ignite"),
-                    TouLocale.GetParsed(OptionGroupSingleton<ArsonistOptions>.Instance.LegacyArsonist
-                        ? $"TouRole{LocaleKey}IgniteWikiDescriptionLegacy"
-                        : $"TouRole{LocaleKey}IgniteWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Ignite", "Ignite"),
+                    MiraLocaleManager.Get(OptionGroupSingleton<ArsonistOptions>.Instance.LegacyArsonist
+                        ? $"TownOfUsMira.Role.{IdPart}Ignite.WikiDescriptionLegacy"
+                        : $"TownOfUsMira.Role.{IdPart}Ignite.WikiDescription"),
                     TouNeutAssets.IgniteButtonSprite)
-            };
+            ];
         }
     }
 
@@ -87,6 +84,7 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Arsonist.LoadAsset(), "TouMira.Role.Neutral.Arsonist", 1.45f),
         CanUseVent = OptionGroupSingleton<ArsonistOptions>.Instance.CanVent,
         IntroSound = TouAudio.ArsoIgniteSound,
         OptionsScreenshot = TouBanners.NeutralRoleBanner,
@@ -105,7 +103,7 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
 
         if (allDoused.HasAny())
         {
-            stringB.Append(TownOfUsPlugin.Culture, $"\n<b>{TouLocale.Get("TouRoleArsonistTabDousedInfo")}</b>");
+            stringB.Append(TownOfUsPlugin.Culture, $"\n<b>{MiraLocaleManager.Get("TownOfUsMira.Role.ArsonistTabDousedInfo")}</b>");
             foreach (var plr in allDoused)
             {
                 stringB.Append(TownOfUsPlugin.Culture,
@@ -123,14 +121,14 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
             return false;
         }
 
-        var result = Helpers.GetAlivePlayers().Count <= 2 && MiscUtils.KillersAliveCount == 1;
+        var result = MiscUtils.GetImpactfulLivingPlayers().Count <= 2 && MiscUtils.KillersAliveCount == 1;
 
         return result;
     }
 
     public void OffsetButtons()
     {
-        var canVent = OptionGroupSingleton<ArsonistOptions>.Instance.CanVent || LocalSettingsTabSingleton<TownOfUsLocalSettings>.Instance.OffsetButtonsToggle.Value;
+        var canVent = OptionGroupSingleton<ArsonistOptions>.Instance.CanVent || LocalSettingsTabSingleton<TouLocalTabButtons>.Instance.OffsetButtonsToggle.Value;
         var douse = CustomButtonSingleton<ArsonistDouseButton>.Instance;
         var ignite = CustomButtonSingleton<ArsonistIgniteButton>.Instance;
         Coroutines.Start(MiscUtils.CoMoveButtonIndex(douse, !canVent));
@@ -143,8 +141,11 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
         if (Player.AmOwner)
         {
             OffsetButtons();
-            HudManager.Instance.ImpostorVentButton.graphic.sprite = TouNeutAssets.ArsoVentSprite.LoadAsset();
-            HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Arsonist);
+            if (!LegacyAssets.IsLegacy)
+            {
+                HudManager.Instance.ImpostorVentButton.graphic.sprite = TouNeutAssets.ArsoVentSprite.LoadAsset();
+                HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Arsonist);
+            }
             SetDouseUses();
         }
     }
@@ -153,7 +154,7 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
     {
         RoleBehaviourStubs.Deinitialize(this, targetPlayer);
         TouRoleUtils.ClearTaskHeader(Player);
-        if (Player.AmOwner)
+        if (Player.AmOwner && !LegacyAssets.IsLegacy)
         {
             HudManager.Instance.ImpostorVentButton.graphic.sprite = TouAssets.VentSprite.LoadAsset();
             HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Impostor);
@@ -163,12 +164,8 @@ public sealed class ArsonistRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUs
     public override void OnDeath(DeathReason reason)
     {
         var button = CustomButtonSingleton<ArsonistIgniteButton>.Instance;
-
-        if (button.Ignite != null)
-        {
-            button.Ignite.Clear();
-            button.Ignite = null;
-        }
+        button.Ignite?.Clear();
+        button.Ignite = null;
 
         RoleBehaviourStubs.OnDeath(this, reason);
     }

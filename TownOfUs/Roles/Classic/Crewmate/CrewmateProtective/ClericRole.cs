@@ -7,6 +7,7 @@ using MiraAPI.Roles;
 using Reactor.Networking.Attributes;
 using Reactor.Utilities;
 using TownOfUs.Modifiers.Crewmate;
+using TownOfUs.Options;
 using TownOfUs.Options.Roles.Crewmate;
 using UnityEngine;
 
@@ -16,24 +17,21 @@ public sealed class ClericRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsR
 {
     public override bool IsAffectedByComms => false;
     public DoomableType DoomHintType => DoomableType.Protective;
-    public string LocaleKey => "Cleric";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Cleric";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
-    public static string ProtectionString = TouLocale.GetParsed("TouRoleClericTabProtecting");
+    public static string ProtectionString = MiraLocaleManager.Get("TownOfUsMira.Role.ClericTabProtecting");
 
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        ProtectionString = TouLocale.GetParsed("TouRoleClericTabProtecting");
+        ProtectionString = MiraLocaleManager.Get("TownOfUsMira.Role.ClericTabProtecting");
     }
 
     [HideFromIl2Cpp]
@@ -55,16 +53,16 @@ public sealed class ClericRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsR
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Barrier", "Barrier"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}BarrierWikiDescription").Replace("<BarrierCooldown>",
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Barrier", "Barrier"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Barrier.WikiDescription").Replace("<BarrierCooldown>",
                         $"{OptionGroupSingleton<ClericOptions>.Instance.BarrierCooldown}"),
                     TouCrewAssets.BarrierSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Cleanse", "Cleanse"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}CleanseWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Cleanse", "Cleanse"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Cleanse.WikiDescription"),
                     TouCrewAssets.CleanseSprite)
-            };
+            ];
         }
     }
 
@@ -74,7 +72,8 @@ public sealed class ClericRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsR
 
     public CustomRoleConfiguration Configuration => new(this)
     {
-        IntroSound = TouAudio.ScientistIntroSound,
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Cleric.LoadAsset(), "TouMira.Role.Crewmate.Cleric", 1.45f),
+        IntroSound = TouAudio.PotionIntro,
         OptionsScreenshot = TouBanners.ClericRoleBanner,
         Icon = TouRoleIcons.Cleric
     };
@@ -93,11 +92,11 @@ public sealed class ClericRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsR
             return;
         }
 
-        if (PlayerControl.LocalPlayer.PlayerId == source.PlayerId ||
-            (PlayerControl.LocalPlayer.PlayerId == cleric.PlayerId &&
+        if (source.AmOwner ||
+            (cleric.AmOwner &&
              OptionGroupSingleton<ClericOptions>.Instance.AttackNotif))
         {
-            Coroutines.Start(MiscUtils.CoFlash(TownOfUsColors.Cleric));
+            Coroutines.Start(MiscUtils.CoFlash(OptionGroupSingleton<GameMechanicOptions>.Instance.AnonymousShields && !cleric.AmOwner ? TownOfUsColors.NeutralWiki : TownOfUsColors.Cleric));
         }
     }
 }

@@ -7,8 +7,9 @@ using MiraAPI.Modifiers;
 using MiraAPI.Roles;
 using MiraAPI.Utilities;
 using Reactor.Utilities;
-using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Neutral;
+using TownOfUs.Modules;
+using TownOfUs.Modules.Components;
 using TownOfUs.Options.Roles.Neutral;
 using TownOfUs.Roles.Neutral;
 using UnityEngine;
@@ -54,7 +55,7 @@ public static class ChefEvents
     }
     
     [RegisterEvent]
-    public static void EjectionEventHandler(EjectionEvent @event)
+    public static void EjectionEventHandler(EjectionEvent _)
     {
         var chef = CustomRoleUtils.GetActiveRolesOfType<ChefRole>().FirstOrDefault();
         if (chef != null && chef.TargetsServed && !chef.Player.HasDied())
@@ -62,22 +63,40 @@ public static class ChefEvents
             if (chef.Player.AmOwner)
             {
                 var notif1 = Helpers.CreateAndShowNotification(
-                    TouLocale.GetParsed("TouRoleChefVictoryMessageSelf").Replace("<role>", $"{TownOfUsColors.Chef.ToTextColor()}{chef.RoleName}</color>"),
+                    MiraLocaleManager.Get("TownOfUsMira.Role.ChefVictoryMessageSelf").Replace("<role>", $"{TownOfUsColors.Chef.ToTextColor()}{chef.GetRoleName()}</color>"),
                     Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Chef.LoadAsset());
 
                 notif1.AdjustNotification();
             }
             else
             {
+                string message;
+                LoadableAsset<Sprite> icon;
+
+                if (OptionGroupSingleton<ChefOptions>.Instance.ChefAnonymizeWin)
+                {
+                    message = MiraLocaleManager.Get("TouNeutAnonymousVictoryMessage");
+                    icon = TouRoleIcons.Neutral;
+                }
+                else
+                {
+                    message = MiraLocaleManager.Get("TownOfUsMira.Role.ChefVictoryMessage")
+                        .Replace("<role>", $"{TownOfUsColors.Chef.ToTextColor()}{chef.GetRoleName()}</color>");
+                    icon = TouRoleIcons.Chef;
+                }
+
                 var notif1 = Helpers.CreateAndShowNotification(
-                    TouLocale.GetParsed("TouRoleChefVictoryMessage").Replace("<player>", chef.Player.Data.PlayerName).Replace("<role>", $"{TownOfUsColors.Chef.ToTextColor()}{chef.RoleName}</color>"),
-                    Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Chef.LoadAsset());
+                    message.Replace("<player>", chef.Player.Data.PlayerName),
+                    Color.white, new Vector3(0f, 1f, -20f), spr: icon.LoadAsset());
 
                 notif1.AdjustNotification();
             }
-            DeathHandlerModifier.UpdateDeathHandlerImmediate(chef.Player, TouLocale.Get("DiedToWinning"),
-                DeathEventHandlers.CurrentRound, DeathHandlerOverride.SetFalse,
-                lockInfo: DeathHandlerOverride.SetTrue);
+            var stats = GameHistory.PlayerStats[chef.Player.PlayerId];
+            stats.DeathString = MiraLocaleManager.Get("DiedToWinning");
+            stats.RoundOfDeath = HudManagerHelper.Instance.CurrentRound;
+            stats.DiedThisRound = false;
+            stats.PlayerState = StoredPlayerState.Dead;
+            stats.LockDeathInfo = true;
 
             chef.Player.Exiled();
         }
@@ -102,22 +121,39 @@ public static class ChefEvents
             if (chef.Player.AmOwner)
             {
                 var notif1 = Helpers.CreateAndShowNotification(
-                    TouLocale.GetParsed("TouRoleChefVictoryMessageSelf"),
+                    MiraLocaleManager.Get("TownOfUsMira.Role.ChefVictoryMessageSelf"),
                     Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Chef.LoadAsset());
 
                 notif1.AdjustNotification();
             }
             else
             {
+                string message;
+                LoadableAsset<Sprite> icon;
+                
+                if (OptionGroupSingleton<ChefOptions>.Instance.ChefAnonymizeWin)
+                {
+                    message = MiraLocaleManager.Get("TouNeutAnonymousVictoryMessage");
+                    icon = TouRoleIcons.Neutral;
+                }
+                else
+                {
+                    message = MiraLocaleManager.Get("TownOfUsMira.Role.ChefVictoryMessage");
+                    icon = TouRoleIcons.Chef;
+                }
+
                 var notif1 = Helpers.CreateAndShowNotification(
-                    TouLocale.GetParsed("TouRoleChefVictoryMessage").Replace("<player>", chef.Player.Data.PlayerName),
-                    Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Chef.LoadAsset());
+                    message.Replace("<player>", chef.Player.Data.PlayerName),
+                    Color.white, new Vector3(0f, 1f, -20f), spr: icon.LoadAsset());
 
                 notif1.AdjustNotification();
             }
-            DeathHandlerModifier.UpdateDeathHandlerImmediate(chef.Player, TouLocale.Get("DiedToWinning"),
-                DeathEventHandlers.CurrentRound, DeathHandlerOverride.SetFalse,
-                lockInfo: DeathHandlerOverride.SetTrue);
+            var stats = GameHistory.PlayerStats[chef.Player.PlayerId];
+            stats.DeathString = MiraLocaleManager.Get("DiedToWinning");
+            stats.RoundOfDeath = HudManagerHelper.Instance.CurrentRound;
+            stats.DiedThisRound = false;
+            stats.PlayerState = StoredPlayerState.Dead;
+            stats.LockDeathInfo = true;
 
             chef.Player.Exiled();
         }

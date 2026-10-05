@@ -55,13 +55,13 @@ public class WikiHyperlink(IntPtr cppPtr) : MonoBehaviour(cppPtr)
         Warning($"Looking for wiki entry: {id}");
         if (id.StartsWith("AmongUs.Roles.", StringComparison.InvariantCulture))
         {
-            id = id.Substring("AmongUs.Roles.".Length);
+            id = id["AmongUs.Roles.".Length..];
         }
 
         var role = MiscUtils.AllRoles.FirstOrDefault(x => x.GetType().FullName == id) ??
                    MiscUtils.AllRegisteredRoles.FirstOrDefault(x => x.Role.ToString() == id) ??
                    RoleManager.Instance.GetRole(RoleTypes.Crewmate); // i hate il2cpp
-        var modifier = MiscUtils.AllModifiers.FirstOrDefault(x => x.GetType().FullName == id);
+        var modifier = MiscUtils.AllOverallWikiModifiers.FirstOrDefault(x => x.GetType().FullName == id);
 
         dynamic wikiEntry;
         if (role is IWikiDiscoverable wikiRole)

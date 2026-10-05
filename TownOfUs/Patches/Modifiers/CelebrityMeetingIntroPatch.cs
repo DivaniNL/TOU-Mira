@@ -44,9 +44,9 @@ public static class CelebrityMeetingIntroPatch
         var iconSprite = iconObj.GetComponent<SpriteRenderer>();
         iconSprite.sprite = TouModifierIcons.Celebrity.LoadAsset();
 
-        if (HudManager.Instance != null)
+        if (HudManager.InstanceExists)
         {
-            var title = $"<color=#{TownOfUsColors.Celebrity.ToHtmlStringRGBA()}>{TouLocale.Get("TouRoleCelebrityMessageTitle")}</color>";
+            var title = $"<color=#{TownOfUsColors.Celebrity.ToHtmlStringRGBA()}>{MiraLocaleManager.Get("TownOfUsMira.Role.CelebrityMessageTitle")}</color>";
             MiscUtils.AddFakeChat(celebrity.Player.Data, title, message, false, true);
         }
     }

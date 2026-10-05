@@ -1,7 +1,6 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modifiers.Impostor;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Impostor;
@@ -9,14 +8,14 @@ using UnityEngine;
 
 namespace TownOfUs.Buttons.Impostor;
 
-public sealed class EclipsalBlindButton : TownOfUsRoleButton<EclipsalRole>, IAftermathableButton
+public sealed class EclipsalBlindButton : TownOfUsRoleButton<EclipsalRole>, IAftermathableButton, ILegacyCapable
 {
-    public override string Name => TouLocale.GetParsed("TouRoleEclipsalBlind", "Blind");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.EclipsalBlind", "Blind");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Impostor;
     public override float Cooldown => Math.Clamp(OptionGroupSingleton<EclipsalOptions>.Instance.BlindCooldown + MapCooldown, 5f, 120f);
     public override float EffectDuration => OptionGroupSingleton<EclipsalOptions>.Instance.BlindDuration;
-    public override LoadableAsset<Sprite> Sprite => TouImpAssets.BlindSprite;
+    public override LoadableAsset<Sprite> Sprite => LegacyAssets.IsLegacy ? LegacyImpAssets.BlindSprite : TouImpAssets.BlindSprite;
 
     public override bool ZeroIsInfinite { get; set; } = true;
 
@@ -27,7 +26,7 @@ public sealed class EclipsalBlindButton : TownOfUsRoleButton<EclipsalRole>, IAft
 
     protected override void OnClick()
     {
-        OverrideName(TouLocale.Get("TouRoleEclipsalUnblinding", "Unblinding"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.EclipsalUnblinding", "Unblinding"));
         var blindRadius = OptionGroupSingleton<EclipsalOptions>.Instance.BlindRadius;
         var blindedPlayers =
             Helpers.GetClosestPlayers(PlayerControl.LocalPlayer, blindRadius * ShipStatus.Instance.MaxLightRadius);
@@ -41,6 +40,6 @@ public sealed class EclipsalBlindButton : TownOfUsRoleButton<EclipsalRole>, IAft
 
     public override void OnEffectEnd()
     {
-        OverrideName(TouLocale.Get("TouRoleEclipsalBlind", "Blind"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.EclipsalBlind", "Blind"));
     }
 }

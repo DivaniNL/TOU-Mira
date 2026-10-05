@@ -10,6 +10,7 @@ using TownOfUs.Buttons.Neutral;
 using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Crewmate;
 using TownOfUs.Modifiers.Neutral;
+using TownOfUs.Options;
 using TownOfUs.Options.Roles.Neutral;
 using TownOfUs.Roles.Neutral;
 
@@ -24,14 +25,14 @@ public static class MercenaryEvents
             return;
         }
 
-        button?.ResetCooldownAndOrEffect();
+        button?.ResetButtonCooldown(true);
 
         if (source.Data.Role is WerewolfRole)
         {
             CustomButtonSingleton<WerewolfRampageButton>.Instance.ResetCooldownAndOrEffect();
         }
 
-        source.SetKillTimer(source.GetKillCooldown());
+        source.SetKillTimer(source.GetReducedKillCooldown());
     }
     [RegisterEvent]
     public static void MiraButtonClickEventHandler(MiraButtonClickEvent @event)
@@ -78,7 +79,8 @@ public static class MercenaryEvents
         var mercOpts = OptionGroupSingleton<MercenaryOptions>.Instance;
 
         var noAttack = (target.PlayerId == source.PlayerId ||
-                        source.HasModifier<IndirectAttackerModifier>() ||
+                        @event is BeforeMurderEvent { IgnoreDefense: true } ||
+                        @event is ExtendedMiraButtonClickEvent { IgnoreDefense: true } ||
                         source.HasModifier<InvulnerabilityModifier>() ||
                         source.HasModifier<VeteranAlertModifier>() ||
                         @event is not BeforeMurderEvent);
@@ -101,7 +103,7 @@ public static class MercenaryEvents
             if (source.AmOwner)
             {
                 ResetButtonTimer(source, button);
-                Coroutines.Start(MiscUtils.CoFlash(TownOfUsColors.Mercenary, alpha: 0.5f));
+                Coroutines.Start(MiscUtils.CoFlash(OptionGroupSingleton<GameMechanicOptions>.Instance.AnonymousShields ? TownOfUsColors.NeutralWiki : TownOfUsColors.Mercenary, alpha: 0.5f));
             }
         }
 

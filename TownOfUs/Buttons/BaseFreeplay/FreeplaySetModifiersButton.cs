@@ -1,6 +1,5 @@
 using MiraAPI.Hud;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using Reactor.Networking.Rpc;
 using TownOfUs.Modifiers.Game.Alliance;
 using TownOfUs.Networking;
@@ -15,7 +14,7 @@ namespace TownOfUs.Buttons.BaseFreeplay;
 /// </summary>
 public sealed class FreeplaySetModifiersButton : TownOfUsButton
 {
-    public override string Name => TouLocale.GetParsed("FreeplaySetModifiersButton", "Set Modifiers");
+    public override string Name => MiraLocaleManager.Get("FreeplaySetModifiersButton", "Set Modifiers");
     public override Color TextOutlineColor => new Color32(89, 223, 231, 255);
     public override float Cooldown => 0.001f;
     public override float InitialCooldown => 0.001f;
@@ -28,7 +27,7 @@ public sealed class FreeplaySetModifiersButton : TownOfUsButton
 
     public override bool Enabled(RoleBehaviour? role)
     {
-        return PlayerControl.LocalPlayer != null &&
+        return PlayerControl.LocalPlayer &&
                (TutorialManager.InstanceExists || MultiplayerFreeplayMode.Enabled) &&
                !FreeplayButtonsVisibility.Hidden;
     }

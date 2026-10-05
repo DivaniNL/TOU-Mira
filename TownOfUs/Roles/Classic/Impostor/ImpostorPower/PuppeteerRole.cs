@@ -6,7 +6,6 @@ using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
 using MiraAPI.Utilities;
 using Reactor.Networking.Attributes;
-using Reactor.Utilities.Extensions;
 using TownOfUs.Interfaces;
 using TownOfUs.Modifiers.Impostor;
 using TownOfUs.Modules.ControlSystem;
@@ -30,14 +29,11 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
     private LobbyNotificationMessage? controllerNotification;
 
     public DoomableType DoomHintType => DoomableType.Trickster;
-    public string LocaleKey => "Puppeteer";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Puppeteer";
 
     public string GetAdvancedDescription()
     {
-        return TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") + MiscUtils.AppendOptionsText(GetType());
+        return MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") + MiscUtils.AppendOptionsText(GetType());
     }
 
     public Color RoleColor => TownOfUsColors.Impostor;
@@ -46,6 +42,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Puppeteer.LoadAsset(), "TouMira.Role.Impostor.Puppeteer", 1.45f),
         UseVanillaKillButton = false,
         Icon = TouRoleIcons.Puppeteer,
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
@@ -56,8 +53,8 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
     [HideFromIl2Cpp]
     public List<CustomButtonWikiDescription> Abilities =>
     [
-        new(TouLocale.GetParsed($"TouRole{LocaleKey}Control", "Control"),
-            TouLocale.GetParsed($"TouRole{LocaleKey}ControlWikiDescription"),
+        new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Control", "Control"),
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Control.WikiDescription"),
             TouImpAssets.ControlSprite),
     ];
 
@@ -99,7 +96,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
 
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data == null || Player.HasDied() || !Player.AmOwner)
+        if (!Player || Player.Data == null || Player.HasDied() || !Player.AmOwner)
         {
             return;
         }
@@ -142,18 +139,19 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
 
     private void CreateNotification()
     {
-        if (Controlled == null || PlayerControl.LocalPlayer == null || !Player.AmOwner)
+        if (Controlled == null || !PlayerControl.LocalPlayer || !Player.AmOwner)
         {
             return;
         }
 
         if (controllerNotification == null)
         {
-            var controllerText = TouLocale.GetParsed("TouRolePuppeteerControlNotif", $"You are controlling {Controlled.Data.PlayerName}!");
+            var controllerText = MiraLocaleManager.Get("TownOfUsMira.Role.PuppeteerControlNotifSelf");
             controllerNotification = Helpers.CreateAndShowNotification(
                 $"<b>{TownOfUsColors.Impostor.ToTextColor()}{controllerText.Replace("<player>", Controlled.Data.PlayerName)}</color></b>",
                 Color.white, new Vector3(0f, 2f, -20f), spr: TouRoleIcons.Puppeteer.LoadAsset());
-            controllerNotification?.AdjustNotification();
+            controllerNotification.AdjustNotification();
+            controllerNotification.alphaTimer = OptionGroupSingleton<PuppeteerOptions>.Instance.ControlDuration.Value;
         }
     }
 
@@ -161,7 +159,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
     {
         if (controllerNotification != null && controllerNotification.gameObject != null)
         {
-            controllerNotification.gameObject.Destroy();
+            controllerNotification.gameObject.DeepDestroy();
             controllerNotification = null;
         }
     }
@@ -235,7 +233,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
         }
         else if (target.AmOwner && OptionGroupSingleton<PuppeteerOptions>.Instance.VictimSeesControlDirection.Value > 0)
         {
-            puppeteer.AddModifier<PuppeteerHintArrowModifier>(PlayerControl.LocalPlayer);
+            puppeteer.AddModifier<PuppeteerHintArrowModifier>(target);
         }
     }
 
@@ -262,10 +260,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
 
             if (target.MyPhysics != null)
             {
-                if (target.MyPhysics.body != null)
-                {
-                    target.MyPhysics.body.velocity = Vector2.zero;
-                }
+                target.MyPhysics.body?.velocity = Vector2.zero;
                 target.MyPhysics.SetNormalizedVelocity(Vector2.zero);
             }
 
@@ -400,8 +395,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
                 continue;
             }
 
-            bool canUse;
-            usable.CanUse(player.Data, out canUse, out _);
+            usable.CanUse(player.Data, out bool canUse, out _);
             if (!canUse)
             {
                 continue;
@@ -449,7 +443,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
         }
         else if (interactable.TryCast<ZiplineConsole>() is { } ziplineConsole)
         {
-            if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
+            if (!AmongUsClient.Instance || !AmongUsClient.Instance.AmHost)
             {
                 return;
             }
@@ -460,7 +454,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
         }
         else if (interactable.TryCast<OpenDoorConsole>() is { } openDoorConsole)
         {
-            if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
+            if (!AmongUsClient.Instance || !AmongUsClient.Instance.AmHost)
             {
                 return;
             }
@@ -488,7 +482,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
         }
         else if (interactable.TryCast<PlatformConsole>() is { } platformConsole)
         {
-            if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
+            if (!AmongUsClient.Instance || !AmongUsClient.Instance.AmHost)
             {
                 return;
             }
@@ -505,7 +499,7 @@ public sealed class PuppeteerRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
         }
         else if (interactable.TryCast<DeconControl>() is { } deconControl)
         {
-            if (AmongUsClient.Instance == null || !AmongUsClient.Instance.AmHost)
+            if (!AmongUsClient.Instance || !AmongUsClient.Instance.AmHost)
             {
                 return;
             }

@@ -17,7 +17,6 @@ using TownOfUs.Options.Roles.Crewmate;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace TownOfUs.Roles.Impostor;
 
@@ -26,7 +25,7 @@ public sealed class JanitorRole(IntPtr cppPtr)
 {
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data.Role is not JanitorRole || Player.HasDied() || !Player.AmOwner ||
+        if (!Player || Player.Data.Role is not JanitorRole || Player.HasDied() || !Player.AmOwner ||
             MeetingHud.Instance || (!HudManager.Instance.UseButton.isActiveAndEnabled &&
                                     !HudManager.Instance.PetButton.isActiveAndEnabled))
         {
@@ -41,15 +40,13 @@ public sealed class JanitorRole(IntPtr cppPtr)
 
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<ForensicRole>());
     public DoomableType DoomHintType => DoomableType.Death;
-    public string LocaleKey => "Janitor";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Janitor";
+    public string RoleMedDescriptionLocale => $"TownOfUsMira.Role.{IdPart}.TabDescription";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -59,6 +56,7 @@ public sealed class JanitorRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Janitor.LoadAsset(), "TouMira.Role.Impostor.Janitor", 1.45f),
         UseVanillaKillButton = true,
         Icon = TouRoleIcons.Janitor,
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
@@ -72,12 +70,12 @@ public sealed class JanitorRole(IntPtr cppPtr)
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Clean", "Clean"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}CleanWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Clean", "Clean"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Clean.WikiDescription"),
                     TouImpAssets.CleanButtonSprite)
-            };
+            ];
         }
     }
 
@@ -98,20 +96,16 @@ public sealed class JanitorRole(IntPtr cppPtr)
             return;
         }
 
-        var body = TimeLordBodyManager.FindDeadBodyIncludingInactive(bodyId);
-        if (body == null)
-        {
-            body = Object.FindObjectsOfType<DeadBody>().FirstOrDefault(x => x.ParentId == bodyId);
-        }
-
-        TimeLordBodyManager.BodyLogger?.LogError($"[JanitorRPC] Body found: body={body != null}, active={body?.gameObject?.activeSelf ?? false}, position={body?.transform?.position}");
+        var body = TimeLordBodyManager.FindDeadBodyIncludingInactive(bodyId)
+                ?? FindObjectsOfType<DeadBody>().FirstOrDefault(x => x.ParentId == bodyId);
+        TimeLordBodyManager.BodyLogger?.LogError($"[JanitorRPC] Body found: body={body != null}, active={body?.gameObject.activeSelf ?? false}, position={body?.transform?.position}");
 
         if (body != null)
         {
             var touAbilityEvent = new TouAbilityEvent(AbilityType.JanitorClean, player, body);
             MiraEventManager.InvokeEvent(touAbilityEvent);
 
-            var isHost = AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost;
+            var isHost = AmongUsClient.Instance && AmongUsClient.Instance.AmHost;
             var optionEnabled = OptionGroupSingleton<TimeLordOptions>.Instance.UncleanBodiesOnRewind;
             var destroyBody = (BodyVitalsMode)OptionGroupSingleton<GameMechanicOptions>.Instance.CleanedBodiesAppearance.Value;
 

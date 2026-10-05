@@ -5,11 +5,11 @@ using MiraAPI.Hud;
 using MiraAPI.Modifiers;
 using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
-using MiraAPI.Utilities;
 using Reactor.Networking.Attributes;
 using Reactor.Utilities;
 using TownOfUs.Buttons;
 using TownOfUs.Buttons.Neutral;
+using TownOfUs.Modifiers.Game.Assailant;
 using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Options.Roles.Neutral;
 using TownOfUs.Roles.Crewmate;
@@ -22,26 +22,29 @@ public sealed class GlitchRole(IntPtr cppPtr)
 {
     public override void SpawnTaskHeader(PlayerControl playerControl)
     {
-        if (playerControl != PlayerControl.LocalPlayer)
+        if (!playerControl.AmOwner)
         {
             return;
         }
         ImportantTextTask orCreateTask = PlayerTask.GetOrCreateTask<ImportantTextTask>(playerControl, 0);
-        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{TouLocale.GetParsed("NeutralKillingTaskHeader")}</color>";
+        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{MiraLocaleManager.Get("NeutralKillingTaskHeader")}</color>";
         orCreateTask.name = "NeutralRoleText";
     }
 
-    public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<LookoutRole>());
+    [HideFromIl2Cpp]
+    public bool IsModifierApplicable(BaseModifier modifier)
+    {
+        return modifier is not OverclockerModifier;
+    }
+
+    public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<BarkeeperRole>());
     public DoomableType DoomHintType => DoomableType.Perception;
-    public string LocaleKey => "Glitch";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Glitch";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -50,15 +53,15 @@ public sealed class GlitchRole(IntPtr cppPtr)
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Mimic", "Mimic"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}MimicWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Mimic", "Mimic"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Mimic.WikiDescription"),
                     TouNeutAssets.MimicSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Hack", "Hack"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}HackWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Hack", "Hack"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Hack.WikiDescription"),
                     TouNeutAssets.HackSprite)
-            };
+            ];
         }
     }
 
@@ -68,7 +71,8 @@ public sealed class GlitchRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
-        CanUseVent = OptionGroupSingleton<GlitchOptions>.Instance.CanVent,
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Glitch.LoadAsset(), "TouMira.Role.Neutral.Glitch", 1.45f),
+        CanUseVent = (GlitchVent)OptionGroupSingleton<GlitchOptions>.Instance.CanVent.Value is not GlitchVent.Never,
         IntroSound = TouAudio.GlitchSound,
         OptionsScreenshot = TouBanners.NeutralRoleBanner,
         Icon = TouRoleIcons.Glitch,
@@ -81,12 +85,12 @@ public sealed class GlitchRole(IntPtr cppPtr)
     {
         var glitchCount = CustomRoleUtils.GetActiveRolesOfType<GlitchRole>().Count(x => !x.Player.HasDied());
 
-        if (MiscUtils.KillersAliveCount > glitchCount)
+        if (MiscUtils.KillersAliveCount > glitchCount || MiscUtils.KillersAliveCount == 0)
         {
             return false;
         }
 
-        return glitchCount >= Helpers.GetAlivePlayers().Count - glitchCount;
+        return glitchCount >= MiscUtils.GetImpactfulLivingPlayers().Count - glitchCount;
     }
 
 
@@ -95,7 +99,7 @@ public sealed class GlitchRole(IntPtr cppPtr)
     public void OffsetButtons()
     {
         // Because Glitch has multiple buttons, there's no need to offset it without a vent button; it looks weird with a random space - Atony
-        var canVent = OptionGroupSingleton<GlitchOptions>.Instance.CanVent;
+        var canVent = (GlitchVent)OptionGroupSingleton<GlitchOptions>.Instance.CanVent.Value is not GlitchVent.Never;
         var hack = CustomButtonSingleton<GlitchHackButton>.Instance;
         var mimic = CustomButtonSingleton<GlitchMimicButton>.Instance;
         var kill = CustomButtonSingleton<GlitchKillButton>.Instance;
@@ -119,8 +123,11 @@ public sealed class GlitchRole(IntPtr cppPtr)
         if (Player.AmOwner)
         {
             OffsetButtons();
-            HudManager.Instance.ImpostorVentButton.graphic.sprite = TouNeutAssets.GlitchVentSprite.LoadAsset();
-            HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Glitch);
+            if (!LegacyAssets.IsLegacy)
+            {
+                HudManager.Instance.ImpostorVentButton.graphic.sprite = TouNeutAssets.GlitchVentSprite.LoadAsset();
+                HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Glitch);
+            }
             CustomButtonSingleton<FakeVentButton>.Instance.Show = false;
         }
     }
@@ -131,8 +138,11 @@ public sealed class GlitchRole(IntPtr cppPtr)
         TouRoleUtils.ClearTaskHeader(Player);
         if (Player.AmOwner)
         {
-            HudManager.Instance.ImpostorVentButton.graphic.sprite = TouAssets.VentSprite.LoadAsset();
-            HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Impostor);
+            if (!LegacyAssets.IsLegacy)
+            {
+                HudManager.Instance.ImpostorVentButton.graphic.sprite = TouAssets.VentSprite.LoadAsset();
+                HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Impostor);
+            }
             CustomButtonSingleton<FakeVentButton>.Instance.Show = true;
         }
     }

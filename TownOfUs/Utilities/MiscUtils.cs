@@ -17,8 +17,11 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using MiraAPI.GameModes;
+using PowerTools;
 using TMPro;
 using TownOfUs.Events;
+using TownOfUs.GameModes;
 using TownOfUs.Interfaces;
 using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Game;
@@ -30,7 +33,9 @@ using TownOfUs.Patches;
 using TownOfUs.Patches.Misc;
 using TownOfUs.Patches.Options;
 using TownOfUs.Roles;
+using TownOfUs.Roles.Neutral;
 using TownOfUs.Roles.Other;
+using TownOfUs.Roles.TownOfPolus;
 using TownOfUs.Utilities.Appearances;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -40,10 +45,24 @@ namespace TownOfUs.Utilities;
 
 public static class MiscUtils
 {
-
+    /// <summary>
+    /// Get all living players that aren't neutral benigns.
+    /// </summary>
+    /// <returns>A list of alive players.</returns>
+    public static List<PlayerControl> GetImpactfulLivingPlayers()
+    {
+        return
+        [
+            .. GameData.Instance.AllPlayers.ToArray()
+                .Where(x => !x.IsDead && !x.Disconnected && x.Object && !x.Object.Is(RoleAlignment.NeutralBenign))
+                .Select(x => x.Object)
+        ];
+    }
     public static int GameHaltersAliveCount => Helpers.GetAlivePlayers().Count(x =>
         x.Data.Role is IContinuesGame gameHalt && gameHalt.ContinuesGame || x.GetModifiers<BaseModifier>()
             .Any(y => y is IContinuesGame gameHaltMod && gameHaltMod.ContinuesGame));
+
+    public static int NonGameEndingNeutralCount => Helpers.GetAlivePlayers().Count(x => x.Is(RoleAlignment.NeutralBenign));
 
     public static int KillersAliveCount => Helpers.GetAlivePlayers().Count(x => x.IsImpostor() ||
         x.Is(RoleAlignment.NeutralKilling) ||
@@ -74,15 +93,59 @@ public static class MiscUtils
         !(x.TryGetModifier<AllianceGameModifier>(out var allyMod) && !allyMod.CrewContinuesGame) &&
         OptionGroupSingleton<GameMechanicOptions>.Instance.CrewKillersContinue);
 
-    public static IEnumerable<BaseModifier> AllModifiers => ModifierManager.Modifiers;
+    /// <summary>
+    /// Gets all registered <see cref="BaseModifier"/>s in MiraAPI.
+    /// </summary>
+    /// <returns>A list of <see cref="BaseModifier"/>s.</returns>
+    public static IEnumerable<BaseModifier> AllModifiers { get; internal set; }
+    /// <summary>
+    /// Gets all registered <see cref="BaseModifier"/>s in MiraAPI that have the <see cref="IAssignableTargets"/> interface.
+    /// </summary>
+    /// <returns>A list of <see cref="IAssignableTargets"/>s.</returns>
+    public static IEnumerable<IAssignableTargets> AssignableTargetModifiers { get; internal set; }
+    /// <summary>
+    /// Gets all registered <see cref="BaseModifier"/>s in MiraAPI that have the <see cref="IWikiDiscoverable"/> interface.
+    /// </summary>
+    /// <returns>A list of <see cref="BaseModifier"/>s.</returns>
+    public static IEnumerable<BaseModifier> AllTouWikiModifiers { get; internal set; }
+    /// <summary>
+    /// Gets all registered <see cref="BaseModifier"/>s in MiraAPI that have the <see cref="IWikiDiscoverable"/> interface or are present in <see cref="SoftWikiEntries.RoleEntries"/>.
+    /// </summary>
+    /// <returns>A list of <see cref="BaseModifier"/>s.</returns>
+    public static IEnumerable<BaseModifier> AllOverallWikiModifiers { get; internal set; }
+    /// <summary>
+    /// Gets all registered <see cref="TouBaseGameModifier"/>s in MiraAPI.
+    /// </summary>
+    /// <returns>A list of <see cref="TouBaseGameModifier"/>s.</returns>
+    public static IEnumerable<TouBaseGameModifier> AllBaseGameModifiers { get; internal set; }
+    /// <summary>
+    /// Gets all registered <see cref="RoleBehaviour"/>s added through MiraAPI, excluding <see cref="NeutralGhostRole"/> and possibly any other registered basic roles.
+    /// </summary>
+    /// <returns>A list of <see cref="RoleBehaviour"/>s.</returns>
+    public static IEnumerable<RoleBehaviour> AllRoles { get; internal set; }
+    /// <summary>
+    /// Gets all registered <see cref="ITownOfUsRole"/>s.
+    /// </summary>
+    /// <returns>A list of <see cref="ITownOfUsRole"/>s.</returns>
+    public static IEnumerable<ITownOfUsRole> AllTouRoles { get; internal set; }
+    /// <summary>
+    /// Gets all registered <see cref="RoleBehaviour"/>s, excluding <see cref="CrewmateGhostRole"/>, <see cref="ImpostorGhostRole"/>, <see cref="NeutralGhostRole"/>, and possibly any other registered basic roles.
+    /// </summary>
+    /// <returns>A list of <see cref="RoleBehaviour"/>s.</returns>
+    public static IEnumerable<RoleBehaviour> AllInGameRoles { get; internal set; }
 
-    public static IEnumerable<RoleBehaviour> AllRoles => CustomRoleManager.CustomRoleBehaviours;
+    /// <summary>
+    /// Gets all registered <see cref="RoleBehaviour"/>s that aren't blacklisted.
+    /// </summary>
+    /// <returns>A list of <see cref="RoleBehaviour"/>s.</returns>
+    public static IEnumerable<RoleBehaviour> AllRegisteredRoles => AllInGameRoles.Where(x => !Enum.IsDefined(x.Role) || !x.IsRoleBlacklisted());
 
-    public static IEnumerable<RoleBehaviour> AllRegisteredRoles =>
-        RoleManager.Instance.AllRoles.ToArray().Excluding(x => x.IsRoleBlacklisted());
-
+    /// <summary>
+    /// Gets all registered <see cref="RoleBehaviour"/>s that aren't blacklisted and spawn on the current mode.
+    /// </summary>
+    /// <returns>A list of <see cref="RoleBehaviour"/>s.</returns>
     public static IEnumerable<RoleBehaviour> SpawnableRoles =>
-        AllRegisteredRoles.Excluding(x => !CustomRoleUtils.CanSpawnOnCurrentMode(x));
+        AllInGameRoles.Where(x => (!Enum.IsDefined(x.Role) || !x.IsRoleBlacklisted()) && CustomRoleUtils.CanSpawnOnCurrentMode(x));
 
     public static ReadOnlyCollection<IModdedOption>? GetModdedOptionsForRole(Type classType)
     {
@@ -118,7 +181,7 @@ public static class MiscUtils
 
         var builder = new StringBuilder();
         builder.AppendLine(TownOfUsPlugin.Culture,
-            $"\n<size=50%> \n</size><b>{TownOfUsColors.Vigilante.ToTextColor()}{TouLocale.Get("Options")}</color></b>");
+            $"\n<size=50%> \n</size><b>{TownOfUsColors.Vigilante.ToTextColor()}{MiraLocaleManager.Get("Options")}</color></b>");
 
         var insertedSummary = false;
         foreach (var option in options)
@@ -182,7 +245,7 @@ public static class MiscUtils
                     }
 
                     builder.AppendLine(TranslationController.Instance.GetString(enumOption.StringName) + ": " +
-                                       TouLocale.GetParsed(enumOption.Values[enumOption.Value],
+                                       MiraLocaleManager.Get(enumOption.Values[enumOption.Value],
                                            enumOption.Values[enumOption.Value]));
                     break;
                 case ModdedNumberOption numberOption:
@@ -243,7 +306,7 @@ public static class MiscUtils
         {
             var roleAlignment = alignment;
             if (role.RoleOptionsGroup.Name.Replace(" Roles", "") == roleAlignment.ToDisplayString() ||
-                role.RoleOptionsGroup.Name.Replace($" {TouLocale.Get("Roles")}", "") ==
+                role.RoleOptionsGroup.Name.Replace($" {MiraLocaleManager.Get("Roles")}", "") ==
                 roleAlignment.ToDisplayString())
             {
                 return roleAlignment;
@@ -278,7 +341,7 @@ public static class MiscUtils
             {
                 var roleAlignment = alignment;
                 if (customRole.RoleOptionsGroup.Name.Replace(" Roles", "") == roleAlignment.ToDisplayString() ||
-                    customRole.RoleOptionsGroup.Name.Replace($" {TouLocale.Get("Roles")}", "") ==
+                    customRole.RoleOptionsGroup.Name.Replace($" {MiraLocaleManager.Get("Roles")}", "") ==
                     roleAlignment.ToDisplayString())
                 {
                     return roleAlignment;
@@ -288,7 +351,6 @@ public static class MiscUtils
 
         if (role.IsDead)
         {
-            // TODO: Add support in MiraAPI for automatic ghost roles, similar to Spectator. Then, we can rely on that for better checks.
             if (role.IsNeutral())
             {
                 return RoleAlignment.NeutralAfterlife;
@@ -396,39 +458,11 @@ public static class MiscUtils
         return ModifierFaction.External;
     }
 
-    public static ModifierFaction GetModifierFaction(this AllianceGameModifier mod)
-    {
-        return mod.FactionType;
-    }
-
-    public static ModifierFaction GetModifierFaction(this TouGameModifier mod)
-    {
-        return mod.FactionType;
-    }
-
-    public static ModifierFaction GetModifierFaction(this UniversalGameModifier mod)
-    {
-        return mod.FactionType;
-    }
-
-    public static ModifierFaction GetModifierFaction(this GameModifier mod)
-    {
-        return GetModifierFaction(mod as BaseModifier);
-    }
-
     public static ModifierFaction GetModifierFaction(this BaseModifier mod)
     {
-        if (mod is TouGameModifier touMod)
+        if (mod is TouBaseGameModifier touMod)
         {
             return touMod.FactionType;
-        }
-        else if (mod is AllianceGameModifier allyMod)
-        {
-            return allyMod.FactionType;
-        }
-        else if (mod is UniversalGameModifier uniMod)
-        {
-            return uniMod.FactionType;
         }
 
         if (SoftWikiEntries.ModifierEntries.ContainsKey(mod))
@@ -446,30 +480,30 @@ public static class MiscUtils
     public static string GetParsedModifierFaction(BaseModifier modifier)
     {
         var localeName = $"{modifier.GetModifierFaction()}";
-        var localizedName = TouLocale.Get(localeName);
+        var localizedName = MiraLocaleManager.Get(localeName);
 
         return localizedName;
     }
 
     public static string GetParsedModifierFaction(ModifierFaction faction, bool coloredText = false)
     {
-        var localizedName = TouLocale.Get($"{faction}");
+        var localizedName = MiraLocaleManager.Get($"{faction}");
 
         if (coloredText)
         {
-            if (localizedName.Contains("Crewmate") || localizedName.Contains(TouLocale.Get("CrewmateKeyword")))
+            if (localizedName.Contains("Crewmate") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate")))
             {
                 localizedName = $"<color=#68ACF4>{localizedName}";
             }
-            else if (localizedName.Contains("Impostor") || localizedName.Contains(TouLocale.Get("ImpostorKeyword")))
+            else if (localizedName.Contains("Impostor") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor")))
             {
                 localizedName = $"<color=#D63F42>{localizedName}";
             }
-            else if (localizedName.Contains("Neutral") || localizedName.Contains(TouLocale.Get("NeutralKeyword")))
+            else if (localizedName.Contains("Neutral") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral")))
             {
                 localizedName = $"<color=#8A8A8A>{localizedName}";
             }
-            else if (localizedName.Contains("Game") || localizedName.Contains(TouLocale.Get("GameKeyword")))
+            else if (localizedName.Contains("Game") || localizedName.Contains(MiraLocaleManager.Get("GameKeyword")))
             {
                 localizedName = $"<color=#888888>{localizedName}";
             }
@@ -486,19 +520,19 @@ public static class MiscUtils
 
     public static string GetColoredFactionString(string text)
     {
-        if (text.Contains("Crewmate") || text.Contains(TouLocale.Get("CrewmateKeyword")))
+        if (text.Contains("Crewmate") || text.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate")))
         {
             text = $"<color=#68ACF4>{text}";
         }
-        else if (text.Contains("Impostor") || text.Contains(TouLocale.Get("ImpostorKeyword")))
+        else if (text.Contains("Impostor") || text.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor")))
         {
             text = $"<color=#D63F42>{text}";
         }
-        else if (text.Contains("Neutral") || text.Contains(TouLocale.Get("NeutralKeyword")))
+        else if (text.Contains("Neutral") || text.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral")))
         {
             text = $"<color=#8A8A8A>{text}";
         }
-        else if (text.Contains("Game") || text.Contains(TouLocale.Get("GameKeyword")))
+        else if (text.Contains("Game") || text.Contains(MiraLocaleManager.Get("GameKeyword")))
         {
             text = $"<color=#888888>{text}";
         }
@@ -515,23 +549,23 @@ public static class MiscUtils
     public static string GetParsedRoleAlignment(ICustomRole role, bool coloredText = false)
     {
         var localeName = $"{role.GetRoleAlignment()}";
-        var localizedName = TouLocale.Get(localeName);
+        var localizedName = MiraLocaleManager.Get(localeName);
 
         if (coloredText)
         {
-            if (localizedName.Contains("Crewmate") || localizedName.Contains(TouLocale.Get("CrewmateKeyword")))
+            if (localizedName.Contains("Crewmate") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate")))
             {
                 localizedName = $"<color=#68ACF4>{localizedName}";
             }
-            else if (localizedName.Contains("Impostor") || localizedName.Contains(TouLocale.Get("ImpostorKeyword")))
+            else if (localizedName.Contains("Impostor") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor")))
             {
                 localizedName = $"<color=#D63F42>{localizedName}";
             }
-            else if (localizedName.Contains("Neutral") || localizedName.Contains(TouLocale.Get("NeutralKeyword")))
+            else if (localizedName.Contains("Neutral") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral")))
             {
                 localizedName = $"<color=#8A8A8A>{localizedName}";
             }
-            else if (localizedName.Contains("Game") || localizedName.Contains(TouLocale.Get("GameKeyword")))
+            else if (localizedName.Contains("Game") || localizedName.Contains(MiraLocaleManager.Get("GameKeyword")))
             {
                 localizedName = $"<color=#888888>{localizedName}";
             }
@@ -548,24 +582,29 @@ public static class MiscUtils
 
     public static string GetParsedRoleAlignment(RoleBehaviour role, bool coloredText = false)
     {
-        var localeName = $"{role.GetRoleAlignment()}";
-        var localizedName = TouLocale.Get(localeName);
+        var roleAlignment = role.GetRoleAlignment();
+        var localeName = $"{roleAlignment}";
+        if (roleAlignment is RoleAlignment.Crewmate or RoleAlignment.Impostor or RoleAlignment.Neutral)
+        {
+            localeName = $"MiraApi.RoleTeam.{roleAlignment}";
+        }
+        var localizedName = MiraLocaleManager.Get(localeName);
 
         if (coloredText)
         {
-            if (localizedName.Contains("Crewmate") || localizedName.Contains(TouLocale.Get("CrewmateKeyword")))
+            if (localizedName.Contains("Crewmate") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate")))
             {
                 localizedName = $"<color=#68ACF4>{localizedName}";
             }
-            else if (localizedName.Contains("Impostor") || localizedName.Contains(TouLocale.Get("ImpostorKeyword")))
+            else if (localizedName.Contains("Impostor") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor")))
             {
                 localizedName = $"<color=#D63F42>{localizedName}";
             }
-            else if (localizedName.Contains("Neutral") || localizedName.Contains(TouLocale.Get("NeutralKeyword")))
+            else if (localizedName.Contains("Neutral") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral")))
             {
                 localizedName = $"<color=#8A8A8A>{localizedName}";
             }
-            else if (localizedName.Contains("Game") || localizedName.Contains(TouLocale.Get("GameKeyword")))
+            else if (localizedName.Contains("Game") || localizedName.Contains(MiraLocaleManager.Get("GameKeyword")))
             {
                 localizedName = $"<color=#888888>{localizedName}";
             }
@@ -583,23 +622,28 @@ public static class MiscUtils
     public static string GetParsedRoleAlignment(RoleAlignment roleAlignment, bool coloredText = false)
     {
         var localeName = $"{roleAlignment}";
-        var localizedName = TouLocale.Get(localeName);
+        if (roleAlignment is RoleAlignment.Crewmate or RoleAlignment.Impostor or RoleAlignment.Neutral)
+        {
+            localeName = $"MiraApi.RoleTeam.{roleAlignment}";
+        }
+
+        var localizedName = MiraLocaleManager.Get(localeName);
 
         if (coloredText)
         {
-            if (localizedName.Contains("Crewmate") || localizedName.Contains(TouLocale.Get("CrewmateKeyword")))
+            if (localizedName.Contains("Crewmate") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate")))
             {
                 localizedName = $"<color=#68ACF4>{localizedName}";
             }
-            else if (localizedName.Contains("Impostor") || localizedName.Contains(TouLocale.Get("ImpostorKeyword")))
+            else if (localizedName.Contains("Impostor") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor")))
             {
                 localizedName = $"<color=#D63F42>{localizedName}";
             }
-            else if (localizedName.Contains("Neutral") || localizedName.Contains(TouLocale.Get("NeutralKeyword")))
+            else if (localizedName.Contains("Neutral") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral")))
             {
                 localizedName = $"<color=#8A8A8A>{localizedName}";
             }
-            else if (localizedName.Contains("Game") || localizedName.Contains(TouLocale.Get("GameKeyword")))
+            else if (localizedName.Contains("Game") || localizedName.Contains(MiraLocaleManager.Get("GameKeyword")))
             {
                 localizedName = $"<color=#888888>{localizedName}";
             }
@@ -614,9 +658,44 @@ public static class MiscUtils
         return localizedName;
     }
 
+    public static Color GetRoleFactionColor(RoleBehaviour role, bool useAltColors = false)
+    {
+        if (role)
+        {
+            if (role.IsCrewmate())
+            {
+                return useAltColors ? TownOfUsColors.Crewmate : Palette.CrewmateBlue;
+            }
+
+            if (role.IsImpostor())
+            {
+                return useAltColors ? TownOfUsColors.ImpSoft : TownOfUsColors.Impostor;
+            }
+        }
+
+        return TownOfUsColors.Neutral;
+    }
+
+    public static Color GetRoleFactionColor(RoleAlignment roleAlignment, bool useAltColors = false)
+    {
+        var localeName = $"{roleAlignment}";
+        var localizedName = MiraLocaleManager.Get(localeName);
+
+        if (localizedName.Contains("Crewmate") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate")))
+        {
+            return useAltColors ? TownOfUsColors.Crewmate : Palette.CrewmateBlue;
+        }
+        else if (localizedName.Contains("Impostor") || localizedName.Contains(MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor")))
+        {
+            return useAltColors ? TownOfUsColors.ImpSoft : TownOfUsColors.Impostor;
+        }
+
+        return TownOfUsColors.Neutral;
+    }
+
     public static IEnumerable<RoleBehaviour> GetRegisteredRoles(RoleAlignment alignment)
     {
-        var roles = AllRoles.Where(x => x.GetRoleAlignment() == alignment);
+        var roles = AllInGameRoles.Where(x => x.GetRoleAlignment() == alignment);
 
         var registeredRoles = roles.ToList();
 
@@ -711,55 +790,30 @@ public static class MiscUtils
         return ModifierUtils.GetPlayersWithModifier<T>().FirstOrDefault();
     }
 
-    public static string GetLocaleKey(ITownOfUsRole role)
+    public static string GetIdPart(ICustomRole role)
     {
-        return role.LocaleKey;
+        return role.IdPart;
     }
 
-    public static string GetLocaleKey(ICustomRole role)
+    public static string GetIdPart(RoleBehaviour role)
     {
-        var name = role.RoleName;
-        if (role is ITownOfUsRole touRole)
+        var name = role.Role.ToString();
+        if (role is ICustomRole customRole)
         {
-            name = touRole.LocaleKey;
+            name = customRole.IdPart;
         }
 
         return name;
     }
 
-    public static string GetLocaleKey(RoleBehaviour role)
+    public static string GetIdPart(BaseModifier modifier)
     {
-        var name = role.GetRoleName();
-        if (role is ITownOfUsRole touRole)
+        if (modifier is TouBaseGameModifier touMod)
         {
-            name = touRole.LocaleKey;
+            return touMod.IdPart;
         }
 
-        return name;
-    }
-
-    public static string GetLocaleKey(GameModifier modifier)
-    {
-        return GetLocaleKey(modifier as BaseModifier);
-    }
-
-    public static string GetLocaleKey(BaseModifier modifier)
-    {
-        var name = modifier.ModifierName;
-        if (modifier is TouGameModifier touMod)
-        {
-            name = touMod.LocaleKey;
-        }
-        else if (modifier is AllianceGameModifier allyMod)
-        {
-            name = allyMod.LocaleKey;
-        }
-        else if (modifier is UniversalGameModifier uniMod)
-        {
-            name = uniMod.LocaleKey;
-        }
-
-        return name;
+        return modifier.ModifierName;
     }
 
     public static Color GetRoleColour(string name)
@@ -778,51 +832,11 @@ public static class MiscUtils
 
     public static Color GetModifierColour(BaseModifier modifier)
     {
-        var color = GetRoleColour(GetLocaleKey(modifier).Replace(" ", string.Empty));
-        if (modifier is IColoredModifier colorMod)
+        if (modifier is TouBaseGameModifier touMod)
         {
-            color = colorMod.ModifierColor;
+            return touMod.Configuration.UiColor;
         }
-
-        return color;
-    }
-
-    public static Color GetModifierColour(GameModifier modifier)
-    {
-        var color = GetRoleColour(GetLocaleKey(modifier).Replace(" ", string.Empty));
-        if (modifier is IColoredModifier colorMod)
-        {
-            color = colorMod.ModifierColor;
-        }
-
-        return color;
-    }
-
-    public static Color GetModifierColour(TouGameModifier modifier)
-    {
-        var color = GetRoleColour(GetLocaleKey(modifier).Replace(" ", string.Empty));
-        if (modifier is IColoredModifier colorMod)
-        {
-            color = colorMod.ModifierColor;
-        }
-
-        return color;
-    }
-
-    public static Color GetModifierColour(UniversalGameModifier modifier)
-    {
-        var color = GetRoleColour(GetLocaleKey(modifier).Replace(" ", string.Empty));
-        if (modifier is IColoredModifier colorMod)
-        {
-            color = colorMod.ModifierColor;
-        }
-
-        return color;
-    }
-
-    public static Color GetModifierColour(AllianceGameModifier modifier)
-    {
-        var color = GetRoleColour(GetLocaleKey(modifier).Replace(" ", string.Empty));
+        var color = GetRoleColour(GetIdPart(modifier).Replace(" ", string.Empty));
         if (modifier is IColoredModifier colorMod)
         {
             color = colorMod.ModifierColor;
@@ -901,22 +915,28 @@ public static class MiscUtils
     {
         if (!FakeChatHistory.IsReplaying)
         {
-            FakeChatHistory.Record(nameText, message);
+            FakeChatHistory.Record(basePlayer, nameText, message);
         }
         
         var chat = HudManager.Instance.Chat;
 
         var pooledBubble = chat.GetPooledBubble();
+        var clonedBubble = chat.GetPooledBubble();
+        clonedBubble.gameObject.name = TeamChatPatches.PublicBubbleName;
 
-        pooledBubble.transform.SetParent(chat.scroller.Inner);
+        pooledBubble.transform.SetParent(TeamChatPatches.PublicChatItems);
+        clonedBubble.transform.SetParent(TeamChatPatches.MergedChatItems);
         pooledBubble.transform.localScale = Vector3.one;
+        clonedBubble.transform.localScale = Vector3.one;
         if (onLeft)
         {
             pooledBubble.SetLeft();
+            clonedBubble.SetLeft();
         }
         else
         {
             pooledBubble.SetRight();
+            clonedBubble.SetRight();
         }
 
         pooledBubble.SetCosmetics(basePlayer);
@@ -931,16 +951,32 @@ public static class MiscUtils
         pooledBubble.Background.size = new Vector2(5.52f,
             0.2f + pooledBubble.NameText.GetNotDumbRenderedHeight() + pooledBubble.TextArea.GetNotDumbRenderedHeight());
         pooledBubble.MaskArea.size = pooledBubble.Background.size - new Vector2(0, 0.03f);
+
+        clonedBubble.SetCosmetics(basePlayer);
+        clonedBubble.NameText.text = nameText;
+        clonedBubble.NameText.color = Color.white;
+        clonedBubble.NameText.ForceMeshUpdate(true, true);
+        clonedBubble.votedMark.enabled = false;
+        clonedBubble.Xmark.enabled = false;
+        clonedBubble.TextArea.text = message;
+        clonedBubble.TextArea.text = WikiHyperLinkPatches.CheckForTags(message, clonedBubble.TextArea);
+        clonedBubble.TextArea.ForceMeshUpdate(true, true);
+        clonedBubble.Background.size = new Vector2(5.52f,
+            0.2f + clonedBubble.NameText.GetNotDumbRenderedHeight() + clonedBubble.TextArea.GetNotDumbRenderedHeight());
+        clonedBubble.MaskArea.size = clonedBubble.Background.size - new Vector2(0, 0.03f);
         if (altColors)
         {
             pooledBubble.Background.color = Color.black;
             pooledBubble.TextArea.color = Color.white;
+            clonedBubble.Background.color = Color.black;
+            clonedBubble.TextArea.color = Color.white;
         }
 
         pooledBubble.AlignChildren();
-        var pos = pooledBubble.NameText.transform.localPosition;
-        pooledBubble.NameText.transform.localPosition = pos;
-        chat.AlignAllBubbles();
+        clonedBubble.AlignChildren();
+        TeamChatPatches.PublicChatBubbles.Add(pooledBubble);
+        TeamChatPatches.MergedChatBubbles.Add(new TeamChatPatches.MergedBubble(clonedBubble, true));
+        TeamChatPatches.AlignAllChatBubbles(chat, ChatToCheck.Public);
         if (chat is { IsOpenOrOpening: false, notificationRoutine: null })
         {
             chat.notificationRoutine = chat.StartCoroutine(chat.BounceDot());
@@ -960,16 +996,22 @@ public static class MiscUtils
         var chat = HudManager.Instance.Chat;
 
         var pooledBubble = chat.GetPooledBubble();
+        var clonedBubble = chat.GetPooledBubble();
+        clonedBubble.gameObject.name = TeamChatPatches.PublicBubbleName;
 
-        pooledBubble.transform.SetParent(chat.scroller.Inner);
+        pooledBubble.transform.SetParent(TeamChatPatches.PublicChatItems);
+        clonedBubble.transform.SetParent(TeamChatPatches.MergedChatItems);
         pooledBubble.transform.localScale = Vector3.one;
+        clonedBubble.transform.localScale = Vector3.one;
         if (onLeft)
         {
             pooledBubble.SetLeft();
+            clonedBubble.SetLeft();
         }
         else
         {
             pooledBubble.SetRight();
+            clonedBubble.SetRight();
         }
 
         pooledBubble.SetCosmetics(basePlayer);
@@ -984,16 +1026,33 @@ public static class MiscUtils
         pooledBubble.Background.size = new Vector2(5.52f,
             0.2f + pooledBubble.NameText.GetNotDumbRenderedHeight() + pooledBubble.TextArea.GetNotDumbRenderedHeight());
         pooledBubble.MaskArea.size = pooledBubble.Background.size - new Vector2(0, 0.03f);
+
+        clonedBubble.SetCosmetics(basePlayer);
+        clonedBubble.NameText.text = nameText;
+        clonedBubble.NameText.color = Color.white;
+        clonedBubble.NameText.ForceMeshUpdate(true, true);
+        clonedBubble.votedMark.enabled = false;
+        clonedBubble.Xmark.enabled = false;
+        clonedBubble.TextArea.text = message;
+        clonedBubble.TextArea.text = WikiHyperLinkPatches.CheckForTags(message, clonedBubble.TextArea);
+        clonedBubble.TextArea.ForceMeshUpdate(true, true);
+        clonedBubble.Background.size = new Vector2(5.52f,
+            0.2f + clonedBubble.NameText.GetNotDumbRenderedHeight() + clonedBubble.TextArea.GetNotDumbRenderedHeight());
+        clonedBubble.MaskArea.size = clonedBubble.Background.size - new Vector2(0, 0.03f);
+
         if (altColors)
         {
             pooledBubble.Background.color = Color.black;
             pooledBubble.TextArea.color = Color.white;
+            clonedBubble.Background.color = Color.black;
+            clonedBubble.TextArea.color = Color.white;
         }
 
         pooledBubble.AlignChildren();
-        var pos = pooledBubble.NameText.transform.localPosition;
-        pooledBubble.NameText.transform.localPosition = pos;
-        chat.AlignAllBubbles();
+        clonedBubble.AlignChildren();
+        TeamChatPatches.PublicChatBubbles.Add(pooledBubble);
+        TeamChatPatches.MergedChatBubbles.Add(new TeamChatPatches.MergedBubble(clonedBubble, true));
+        TeamChatPatches.AlignAllChatBubbles(chat, ChatToCheck.Public);
         if (chat is { IsOpenOrOpening: false, notificationRoutine: null })
         {
             chat.notificationRoutine = chat.StartCoroutine(chat.BounceDot());
@@ -1013,16 +1072,23 @@ public static class MiscUtils
         var chat = HudManager.Instance.Chat;
 
         var pooledBubble = chat.GetPooledBubble();
+        var clonedBubble = chat.GetPooledBubble();
 
-        pooledBubble.transform.SetParent(chat.scroller.Inner);
+        pooledBubble.transform.SetParent(blackoutText
+            ? TeamChatPatches.PrivateChatItems
+            : TeamChatPatches.PublicChatItems);
+        clonedBubble.transform.SetParent(TeamChatPatches.MergedChatItems);
         pooledBubble.transform.localScale = Vector3.one;
+        clonedBubble.transform.localScale = Vector3.one;
         if (onLeft)
         {
             pooledBubble.SetLeft();
+            clonedBubble.SetLeft();
         }
         else
         {
             pooledBubble.SetRight();
+            clonedBubble.SetRight();
         }
 
         pooledBubble.SetCosmetics(basePlayer);
@@ -1036,11 +1102,50 @@ public static class MiscUtils
             0.2f + pooledBubble.NameText.GetNotDumbRenderedHeight() + pooledBubble.TextArea.GetNotDumbRenderedHeight());
         pooledBubble.MaskArea.size = pooledBubble.Background.size - new Vector2(0, 0.03f);
 
+        clonedBubble.SetCosmetics(basePlayer);
+        clonedBubble.NameText.text = nameText;
+        clonedBubble.NameText.ForceMeshUpdate(true, true);
+        clonedBubble.votedMark.enabled = false;
+        clonedBubble.Xmark.enabled = false;
+        clonedBubble.TextArea.text = message;
+        clonedBubble.TextArea.ForceMeshUpdate(true, true);
+        clonedBubble.Background.size = new Vector2(5.52f,
+            0.2f + clonedBubble.NameText.GetNotDumbRenderedHeight() + clonedBubble.TextArea.GetNotDumbRenderedHeight());
+        clonedBubble.MaskArea.size = clonedBubble.Background.size - new Vector2(0, 0.03f);
+
+        if (bubbleType is BubbleType.Jailor)
+        {
+            pooledBubble.ColorBlindName.gameObject.SetActive(false);
+            clonedBubble.ColorBlindName.gameObject.SetActive(false);
+
+            var pooledCos = pooledBubble.Player.cosmetics;
+            pooledCos.skin.gameObject.SetActive(false);
+            pooledCos.hat.gameObject.SetActive(false);
+            pooledCos.skin.gameObject.SetActive(false);
+            pooledCos.currentBodySprite.BodySprite.enabled = false;
+            var jailedPlayer = Object.Instantiate(pooledCos.visor.gameObject, pooledCos.transform);
+            jailedPlayer.GetComponent<VisorLayer>().Destroy();
+            jailedPlayer.GetComponent<SpriteRenderer>().sprite = TouAssets.JailorPlayerSprite.LoadAsset();
+            pooledCos.visor.gameObject.SetActive(false);
+
+            var clonedCos = clonedBubble.Player.cosmetics;
+            clonedCos.skin.gameObject.SetActive(false);
+            clonedCos.hat.gameObject.SetActive(false);
+            clonedCos.skin.gameObject.SetActive(false);
+            clonedCos.currentBodySprite.BodySprite.enabled = false;
+            var jailedPlayer2 = Object.Instantiate(clonedCos.visor.gameObject, clonedCos.transform);
+            jailedPlayer2.GetComponent<VisorLayer>().Destroy();
+            jailedPlayer2.GetComponent<SpriteRenderer>().sprite = TouAssets.JailorPlayerSprite.LoadAsset();
+            clonedCos.visor.gameObject.SetActive(false);
+        }
         if (blackoutText)
         {
             pooledBubble.Background.color = new Color(0.2f, 0.2f, 0.27f, 1f);
             pooledBubble.NameText.color = Color.white;
             pooledBubble.TextArea.color = Color.white;
+            clonedBubble.Background.color = new Color(0.2f, 0.2f, 0.27f, 1f);
+            clonedBubble.NameText.color = Color.white;
+            clonedBubble.TextArea.color = Color.white;
         }
 
         // Tag *team/private* chat bubbles so the UI can reliably show/hide them.
@@ -1048,26 +1153,28 @@ public static class MiscUtils
         // Note: Lovers chat intentionally uses `blackoutText: false` and should behave like regular chat.
         if (blackoutText && bubbleType != BubbleType.None)
         {
-            pooledBubble.gameObject.name = $"{TeamChatPatches.PrivateBubblePrefix}{bubbleType}";
+            clonedBubble.gameObject.name = TeamChatPatches.PrivateBubbleName;
+        }
+        else
+        {
+            clonedBubble.name = TeamChatPatches.PublicBubbleName;
         }
 
         pooledBubble.AlignChildren();
-        var pos = pooledBubble.NameText.transform.localPosition;
-        pooledBubble.NameText.transform.localPosition = pos;
-        // Only hide/store *team/private* bubbles when the user is currently viewing public chat.
-        // (System/feedback messages should remain in public chat even if they are "black tinted".)
-        if (!PlayerControl.LocalPlayer.Data.IsDead && !TeamChatPatches.TeamChatActive && blackoutText &&
-            bubbleType != BubbleType.None)
+        clonedBubble.AlignChildren();
+        if (blackoutText)
         {
-            TeamChatPatches.storedBubbles.Insert(0, pooledBubble);
-            pooledBubble.gameObject.SetActive(false);
-            if (chat.chatBubblePool.activeChildren.Contains(pooledBubble))
-            {
-                chat.chatBubblePool.activeChildren.Remove(pooledBubble);
-            }
+            TeamChatPatches.PrivateChatBubbles.Add(pooledBubble);
         }
+        else
+        {
+            TeamChatPatches.PublicChatBubbles.Add(pooledBubble);
+        }
+        TeamChatPatches.MergedChatBubbles.Add(new TeamChatPatches.MergedBubble(clonedBubble, !blackoutText));
 
-        chat.AlignAllBubbles();
+        TeamChatPatches.AlignAllChatBubbles(chat, blackoutText
+            ? ChatToCheck.Private
+            : ChatToCheck.Public);
         // Only show the for incoming messages
         // Otherwise you get a notification when you message yourself (e.g. Lovers chat).
         // (I think this is the right way to do that...)
@@ -1098,7 +1205,7 @@ public static class MiscUtils
             BubbleType.Impostor => TouChatAssets.ImpBubble.LoadAsset(),
             BubbleType.Vampire => TouChatAssets.VampBubble.LoadAsset(),
             BubbleType.Lover => TouChatAssets.LoveBubble.LoadAsset(),
-            BubbleType.Jailor => TouChatAssets.JailBubble.LoadAsset(),
+            BubbleType.Jailor or BubbleType.Jailed => TouChatAssets.JailBubble.LoadAsset(),
             _ => null,
         };
         if (actualSprite != null)
@@ -1126,7 +1233,7 @@ public static class MiscUtils
         return infected.Select(impData => impData.Object).ToList();
     }
 
-    public static List<(ushort RoleType, int Chance)> GetRolesToAssign(ModdedRoleTeams team,
+    public static List<(uint Id, ushort RoleType, int Chance)> GetRolesToAssign(ModdedRoleTeams team,
         Func<RoleBehaviour, bool>? filter = null)
     {
         var roles = GetRegisteredRoles(team).Excluding(x => !CustomRoleUtils.CanSpawnOnCurrentMode(x));
@@ -1134,15 +1241,15 @@ public static class MiscUtils
         return GetRolesToAssign(roles, filter);
     }
 
-    public static List<(ushort RoleType, int Chance)> GetRolesToAssign(RoleAlignment alignment,
+    public static HashSet<(uint Id, ushort RoleType, int Chance)> GetRolesToAssign(RoleAlignment alignment,
         Func<RoleBehaviour, bool>? filter = null)
     {
         var roles = GetRegisteredRoles(alignment).Excluding(x => !CustomRoleUtils.CanSpawnOnCurrentMode(x));
 
-        return GetRolesToAssign(roles, filter);
+        return GetRolesToAssign(roles, filter).ToHashSet();
     }
 
-    private static List<(ushort RoleType, int Chance)> GetRolesToAssign(IEnumerable<RoleBehaviour> roles,
+    private static List<(uint Id, ushort RoleType, int Chance)> GetRolesToAssign(IEnumerable<RoleBehaviour> roles,
         Func<RoleBehaviour, bool>? filter = null)
     {
         var currentGameOptions = GameOptionsManager.Instance.CurrentGameOptions;
@@ -1229,17 +1336,17 @@ public static class MiscUtils
         return rolesToKeep;
     }
 
-    private static List<(ushort RoleType, int Chance)> GetPossibleRoles(
+    private static List<(uint Id, ushort RoleType, int Chance)> GetPossibleRoles(
         List<RoleManager.RoleAssignmentData> assignmentData,
         Func<RoleManager.RoleAssignmentData, bool>? predicate = null)
     {
-        var roles = new List<(ushort, int)>();
+        var roles = new List<(uint, ushort, int)>();
 
         assignmentData.Where(x => predicate == null || predicate(x)).ToList().ForEach(x =>
         {
-            for (var i = 0; i < x.Count; i++)
+            for (uint i = 0; i < x.Count; i++)
             {
-                roles.Add(((ushort)x.Role.Role, x.Chance));
+                roles.Add((i, (ushort)x.Role.Role, x.Chance));
             }
         });
 
@@ -1258,7 +1365,7 @@ public static class MiscUtils
         return assignmentData;
     }
 
-    public static PlayerControl? PlayerById(byte id)
+    public static PlayerControl PlayerById(byte id)
     {
         foreach (var player in PlayerControl.AllPlayerControls)
         {
@@ -1268,7 +1375,7 @@ public static class MiscUtils
             }
         }
 
-        return null;
+        return null!;
     }
 
     public static IEnumerator PerformTimedAction(float duration, Action<float> action)
@@ -1355,6 +1462,73 @@ public static class MiscUtils
             yield return new WaitForSeconds(delay);
         }
     }
+    public static IEnumerator FadeInOutPair(SpriteRenderer? rendIn, SpriteRenderer? rendOut, float delay = 0.01f, float increase = 0.01f)
+    {
+        if (rendIn == null || rendOut == null)
+        {
+            yield break;
+        }
+
+        var tmpIn = rendIn.color;
+        tmpIn.a = 0;
+        rendIn.color = tmpIn;
+        var tmpOut = rendOut.color;
+        rendOut.color = tmpOut;
+
+        while (tmpOut.a > 0)
+        {
+            tmpIn.a = Mathf.Min(rendIn.color.a + increase, 1f); // Ensure it doesn't go above 1
+            rendIn.color = tmpIn;
+
+            tmpOut.a = Mathf.Max(rendOut.color.a - increase, 0f); // Ensure it doesn't go below 0
+            rendOut.color = tmpOut;
+
+            yield return new WaitForSeconds(delay);
+        }
+    }
+
+    public static IEnumerator FadeInOutMultiRenderers(SpriteRenderer[] rendsIn, SpriteRenderer[] rendsOut, float delay = 0.01f,
+        float increase = 0.01f)
+    {
+        var tmpIn = rendsIn[0].color;
+        tmpIn.a = 0;
+        var tmpOut = rendsOut[0].color;
+
+        while (tmpOut.a > 0 || tmpIn.a < 1)
+        {
+            tmpIn.a = Mathf.Min(tmpIn.a + increase, 1f); // Ensure it doesn't go above 1
+            foreach (var rend in rendsIn)
+            {
+                rend.color = tmpIn;
+            }
+
+            tmpOut.a = Mathf.Max(tmpOut.a - increase, 0f); // Ensure it doesn't go below 0
+            foreach (var rend in rendsOut)
+            {
+                rend.color = tmpOut;
+            }
+
+            yield return new WaitForSeconds(delay);
+        }
+    }
+
+    public static IEnumerator FadeOutMultiRenderers(SpriteRenderer[] rends, float delay = 0.01f,
+        float increase = 0.01f)
+    {
+        var tmp = rends[0].color;
+
+        while (tmp.a > 0)
+        {
+            tmp.a = Mathf.Max(tmp.a - increase, 0f); // Ensure it doesn't go above 1
+            foreach (var rend in rends)
+            {
+                rend.color = tmp;
+            }
+
+            yield return new WaitForSeconds(delay);
+        }
+
+    }
 
     public static IEnumerator FadeInDualRenderers(SpriteRenderer? rend, SpriteRenderer? rend2, float delay = 0.01f,
         float increase = 0.01f, float rend2Mult = 1f)
@@ -1431,6 +1605,30 @@ public static class MiscUtils
         renderer.color = color;
 
         var arrow = gameObject.AddComponent<ArrowBehaviour>();
+        arrow.image = renderer;
+        arrow.image.color = color;
+
+        return arrow;
+    }
+    public static PingBehaviour CreatePing(Transform parent, Color color)
+    {
+        var gameObject = new GameObject("Ping")
+        {
+            layer = 5,
+            transform =
+            {
+                parent = parent
+            }
+        };
+
+        var renderer = gameObject.AddComponent<SpriteRenderer>();
+        renderer.sprite = TouAssets.ArrowSprite.LoadAsset();
+        renderer.color = color;
+        gameObject.AddComponent<Animator>();
+        var spriteAnim = gameObject.AddComponent<SpriteAnim>();
+        spriteAnim.Play(TouAssets.HeartbeatAnim.LoadAsset());
+
+        var arrow = gameObject.AddComponent<PingBehaviour>();
         arrow.image = renderer;
         arrow.image.color = color;
 
@@ -1518,57 +1716,35 @@ public static class MiscUtils
         cam.centerPosition = cam.Target.transform.position;
     }
 
-    public static List<ushort> ReadFromBucket(List<RoleListOption> buckets, List<(ushort RoleType, int Chance)> roles,
-        RoleListOption roleType, RoleListOption replaceType, RoleListOption biggerType = (RoleListOption)(-1))
+    public static void AddFromBucket(this List<ushort> toApply, List<RoleListOption> buckets,
+        HashSet<(uint Id, ushort RoleType, int Chance)> roles, HashSet<(uint Id, ushort RoleType, int Chance)> applied,
+        RoleListOption roleType, RoleListOption replaceType = (RoleListOption)(-1), RoleListOption biggerType = (RoleListOption)(-1))
     {
-        var result = new List<ushort>();
+        roles.ExceptWith(applied);
 
         while (buckets.Contains(roleType))
         {
             if (roles.Count == 0)
             {
                 var count = buckets.RemoveAll(x => x == roleType);
-                buckets.AddRange(Enumerable.Repeat(replaceType, count));
-                if ((int)biggerType != -1) buckets.AddRange(Enumerable.Repeat(biggerType, count));
-
+                if ((int)replaceType != -1)
+                {
+                    buckets.AddRange(Enumerable.Repeat(replaceType, count));
+                    if ((int)biggerType != -1) buckets.AddRange(Enumerable.Repeat(biggerType, count));
+                }
                 break;
             }
 
             var addedRole = SelectRole(roles);
-            result.Add(addedRole.RoleType);
             roles.Remove(addedRole);
+            toApply.Add(addedRole.RoleType);
+            applied.Add(addedRole);
 
             buckets.Remove(roleType);
         }
-
-        return result;
     }
 
-    public static List<ushort> ReadFromBucket(List<RoleListOption> buckets, List<(ushort RoleType, int Chance)> roles,
-        RoleListOption roleType)
-    {
-        var result = new List<ushort>();
-
-        while (buckets.Contains(roleType))
-        {
-            if (roles.Count == 0)
-            {
-                buckets.RemoveAll(x => x == roleType);
-
-                break;
-            }
-
-            var addedRole = SelectRole(roles);
-            result.Add(addedRole.RoleType);
-            roles.Remove(addedRole);
-
-            buckets.Remove(roleType);
-        }
-
-        return result;
-    }
-
-    public static (ushort RoleType, int Chance) SelectRole(List<(ushort RoleType, int Chance)> roles)
+    public static (uint Id, ushort RoleType, int Chance) SelectRole(HashSet<(uint Id, ushort RoleType, int Chance)> roles)
     {
         var chosenRoles = roles.Where(x => x.Chance == 100).ToList();
         if (chosenRoles.Count > 0)
@@ -1582,7 +1758,7 @@ public static class MiscUtils
         var random = Random.RandomRangeInt(1, total + 1);
 
         var cumulative = 0;
-        (ushort RoleType, int SpawnChance) selectedRole = default;
+        (uint Id, ushort RoleType, int Chance) selectedRole = default;
 
         foreach (var role in chosenRoles)
         {
@@ -1607,7 +1783,7 @@ public static class MiscUtils
     }
 
     // Method to parse a JSON array string into an array of objects
-    public static T[] jsonToArray<T>(string json)
+    public static T[] JsonToArray<T>(string json)
     {
         // Wrap the JSON array in an object
         var newJson = "{ \"array\": " + json + "}";
@@ -1653,6 +1829,33 @@ public static class MiscUtils
     }
 
     /// <summary>
+    /// Gets a <see cref="StonedPlayer"/> by its parent ID.
+    /// </summary>
+    /// <param name="id">The player ID.</param>
+    /// <returns>A <see cref="StonedPlayer"/> or <see langword="null"/> if its not found.</returns>
+    public static StonedPlayer? GetStonedPlayerById(byte id)
+    {
+        var result = StonedPlayer.FakePlayers.FirstOrDefault(body => body.PlayerId == id);
+        return result;
+    }
+
+    /// <summary>
+    /// Gets a <see cref="StonedPlayer"/> by its parent ID if it is not permanent.
+    /// </summary>
+    /// <param name="id">The player ID.</param>
+    /// <returns>A <see cref="StonedPlayer"/> or <see langword="null"/> if its not found.</returns>
+    public static StonedPlayer? GetFreshStonedPlayerById(byte id)
+    {
+        var result = GetStonedPlayerById(id);
+        if (result != null && result.ProgressStage < StoneStage.Permanent)
+        {
+            return result;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     ///     Gets a FakePlayer by comparing PlayerControl.
     /// </summary>
     /// <param name="player">The player themselves.</param>
@@ -1660,6 +1863,26 @@ public static class MiscUtils
     public static FakePlayer? GetFakePlayer(PlayerControl player)
     {
         return FakePlayer.FakePlayers.FirstOrDefault(x => x.body?.name == $"Fake {player.gameObject.name}");
+    }
+
+    /// <summary>
+    ///     Gets a FakePlayer by comparing a player id.
+    /// </summary>
+    /// <param name="playerId">The player id.</param>
+    /// <returns>A fake player or null if its not found.</returns>
+    public static FakePlayer? GetFakePlayer(int playerId)
+    {
+        return FakePlayer.FakePlayers.FirstOrDefault(x => x.PlayerId == playerId && x.body);
+    }
+
+    /// <summary>
+    ///     Gets a FakePlayer by comparing a string.
+    /// </summary>
+    /// <param name="playerName">The player's name.</param>
+    /// <returns>A fake player or null if its not found.</returns>
+    public static FakePlayer? GetFakePlayer(string playerName)
+    {
+        return FakePlayer.FakePlayers.FirstOrDefault(x => x.body?.name == $"Fake {playerName}");
     }
 
     public static void SetForcedBodyType(this PlayerPhysics player, PlayerBodyTypes bodyType)
@@ -1755,32 +1978,6 @@ public static class MiscUtils
         return PlayerControl.LocalPlayer.GetClosestLivingPlayer(includePostors, distance);
     }
 
-    public static void SetSizeLimit(this SpriteRenderer sprite, float pixelSize)
-    {
-        sprite.drawMode = SpriteDrawMode.Sliced;
-        float spriteWidth = sprite.sprite.rect.width;
-        float spriteHeight = sprite.sprite.rect.height;
-
-        if (spriteWidth < spriteHeight)
-        {
-            sprite.size = new Vector2(pixelSize * spriteWidth / spriteHeight, pixelSize);
-        }
-        else
-        {
-            sprite.size = new Vector2(pixelSize, pixelSize * spriteHeight / spriteWidth);
-        }
-    }
-
-    public static void SetSizeLimit(this GameObject spriteObj, float pixelSize)
-    {
-        if (!spriteObj.TryGetComponent<SpriteRenderer>(out var sprite))
-        {
-            return;
-        }
-
-        sprite.SetSizeLimit(pixelSize);
-    }
-
     public static bool DiedOtherRound(this PlayerControl player)
     {
         if (player == null)
@@ -1788,9 +1985,10 @@ public static class MiscUtils
             return false;
         }
 
-        if (player.TryGetModifier<DeathHandlerModifier>(out var deathHandler) && player.HasDied())
+        if (player.HasDied())
         {
-            return !deathHandler.DiedThisRound;
+            var state = GameHistory.PlayerStats[player.PlayerId];
+            return !state.DiedThisRound;
         }
 
         return false;
@@ -1831,7 +2029,7 @@ public static class MiscUtils
             : "Outside/Hallway";
     }
 
-    public static void AddMiraTranslator(this GameObject obj, string stringName, bool parseInfo,
+    public static void AddMiraTranslator(this GameObject obj, string stringName,
         string? defaultStr = null)
     {
         if (obj.TryGetComponent<TextTranslatorTMP>(out var amogTmp))
@@ -1842,11 +2040,10 @@ public static class MiscUtils
 
         var translator = obj.AddComponent<TmpMiraTranslator>();
         translator.stringName = stringName;
-        translator.parseStr = parseInfo;
         translator.defaultStr = defaultStr ?? string.Empty;
     }
 
-    public static void AddMiraTranslator(this Transform obj, string stringName, bool parseInfo,
+    public static void AddMiraTranslator(this Transform obj, string stringName,
         string? defaultStr = null)
     {
         if (obj.TryGetComponent<TextTranslatorTMP>(out var amogTmp))
@@ -1857,19 +2054,18 @@ public static class MiscUtils
 
         var translator = obj.gameObject.AddComponent<TmpMiraTranslator>();
         translator.stringName = stringName;
-        translator.parseStr = parseInfo;
         translator.defaultStr = defaultStr ?? string.Empty;
     }
 
     public static string GetParsedRoleBucket(string bucket)
     {
-        var text = TouLocale.Get(bucket);
-        var crewmateKeyword = TouLocale.Get("CrewmateKeyword");
-        var crewKeyword = TouLocale.Get("CrewKeyword");
-        var impostorKeyword = TouLocale.Get("ImpostorKeyword");
-        var impKeyword = TouLocale.Get("ImpKeyword");
-        var neutralKeyword = TouLocale.Get("NeutralKeyword");
-        var neutKeyword = TouLocale.Get("NeutKeyword");
+        var text = MiraLocaleManager.Get(bucket);
+        var crewmateKeyword = MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate");
+        var crewKeyword = MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate.Short");
+        var impostorKeyword = MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor");
+        var impKeyword = MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor.Short");
+        var neutralKeyword = MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral");
+        var neutKeyword = MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral.Short");
 
         if (text.Contains(impostorKeyword))
         {
@@ -1923,14 +2119,14 @@ public static class MiscUtils
         return text;
     }
 
-    private static List<SupportedLangs> _languagesToBold = new List<SupportedLangs>
-    {
+    private static readonly List<SupportedLangs> _languagesToBold =
+    [
         SupportedLangs.Russian,
         SupportedLangs.Japanese,
         SupportedLangs.SChinese,
         SupportedLangs.TChinese,
         SupportedLangs.Korean
-    };
+    ];
 
     public static void AdjustNotification(this LobbyNotificationMessage notification)
     {
@@ -1996,11 +2192,41 @@ public static class MiscUtils
         }
     }
 
+    public static bool IsBasicGhost(RoleBehaviour role)
+    {
+        return IsBasicGhost(role.Role);
+    }
+
+    public static bool IsBasicGhost(RoleTypes role)
+    {
+        return role is RoleTypes.CrewmateGhost or RoleTypes.ImpostorGhost ||
+               role == (RoleTypes)RoleId.Get<NeutralGhostRole>() ||
+               role == (RoleTypes)RoleId.Get<PolusGhostCrewRole>() ||
+               role == (RoleTypes)RoleId.Get<PolusGhostImpRole>() ||
+               role == (RoleTypes)RoleId.Get<PolusGhostNeutRole>();
+    }
+
     public static TouGamemode CurrentGamemode()
     {
-        if (GameOptionsManager.Instance.CurrentGameOptions.GameMode is GameModes.HideNSeek or GameModes.SeekFools)
+        if (CustomGameModeManager.IsHideNSeek() || GameOptionsManager.Instance.CurrentGameOptions.GameMode is AmongUs.GameOptions.GameModes.HideNSeek or AmongUs.GameOptions.GameModes.SeekFools)
             return TouGamemode.HideAndSeek;
-        return TouGamemode.Normal;
+        if (CustomGameModeManager.IsActiveGameMode<CultistMode>())
+        {
+            return TouGamemode.Cultist;
+        }
+        if (CustomGameModeManager.IsActiveGameMode<KillFrenzyMode>())
+        {
+            return TouGamemode.KillFrenzy;
+        }
+        if (CustomGameModeManager.IsActiveGameMode<TownOfPolusMode>())
+        {
+            return TouGamemode.TownOfPolus;
+        }
+        if (CustomGameModeManager.IsClassic())
+        {
+            return TouGamemode.Normal;
+        }
+        return TouGamemode.Other;
     }
 
     public static void LogInfo(TownOfUsEventHandlers.LogLevel logLevel, string text)
@@ -2010,7 +2236,7 @@ public static class MiscUtils
             if (CanSeePostGameLogs)
             {
                 TownOfUsEventHandlers.LogBuffer.Add(
-                    new(logLevel, $"At {DateTime.UtcNow.ToLongTimeString()} -> " + text));
+                    new(logLevel, $"At {DateTime.UtcNow:T} -> " + text));
             }
 
             return;
@@ -2035,7 +2261,7 @@ public static class MiscUtils
                 break;
         }
 
-        TownOfUsEventHandlers.LogBuffer.Add(new(logLevel, $"At {DateTime.UtcNow.ToLongTimeString()} -> " + text));
+        TownOfUsEventHandlers.LogBuffer.Add(new(logLevel, $"At {DateTime.UtcNow:T} -> " + text));
     }
 
 
@@ -2071,7 +2297,7 @@ public static class MiscUtils
     public static object? TryOtherCast(this Il2CppObjectBase self, Type type)
     {
         return AccessTools.Method(self.GetType(), nameof(Il2CppObjectBase.TryCast)).MakeGenericMethod(type)
-            .Invoke(self, Array.Empty<object>());
+            .Invoke(self, []);
     }
 
     public static IList CreateList(Type myType)
@@ -2114,10 +2340,7 @@ public static class MiscUtils
 
         if (attacker.AmOwner)
         {
-            if (cam != null)
-            {
-                cam.Locked = true;
-            }
+            cam?.Locked = true;
 
             attacker.isKilling = true;
         }
@@ -2128,10 +2351,7 @@ public static class MiscUtils
 
         KillAnimation.SetMovement(attacker, true);
 
-        if (cam != null)
-        {
-            cam.Locked = false;
-        }
+        cam?.Locked = false;
 
         attacker.isKilling = false;
     }
@@ -2196,7 +2416,7 @@ public static class MiscUtils
 
         if (!cantUseCamera) return true;
         var notif1 = Helpers.CreateAndShowNotification(
-            TouLocale.GetParsed(tasksLeftToUnlock > 1 ? "TouUnavailableUtilityNotif" : "TouUnavailableUtilityNotifSingle").Replace("<amount>",
+            MiraLocaleManager.Get(tasksLeftToUnlock > 1 ? "TouUnavailableUtilityNotif" : "TouUnavailableUtilityNotifSingle").Replace("<amount>",
                 $"<size=120%><b>\n{tasksLeftToUnlock.ToString(TownOfUsPlugin.Culture)}</b></size>"),
             Color.white, new Vector3(0f, 1f, -20f), spr: sprite.LoadAsset());
 
@@ -2207,8 +2427,8 @@ public static class MiscUtils
     public static void RunAnticheatWarning(PlayerControl source)
     {
         var stringBuilder = new StringBuilder();
-        stringBuilder.Append(TownOfUsPlugin.Culture, $"{TouLocale.GetParsed("AnticheatIllegalRpcMessage").Replace("<player>", source.Data.PlayerName)}");
-        AddFakeChat(source.Data, $"<color=#D53F42>{TouLocale.Get("AnticheatChatTitle")}</color>", stringBuilder.ToString(), true, altColors:true);
+        stringBuilder.Append(TownOfUsPlugin.Culture, $"{MiraLocaleManager.Get("AnticheatIllegalRpcMessage").Replace("<player>", source.Data.PlayerName)}");
+        AddFakeChat(source.Data, $"<color=#D53F42>{MiraLocaleManager.Get("AnticheatChatTitle")}</color>", stringBuilder.ToString(), true, altColors:true);
     }
 
     public static string GetRegionName(IRegionInfo? region = null, bool shorten = true)
@@ -2262,6 +2482,46 @@ public static class MiscUtils
 
         return name;
     }
+
+    public static void DelayExile(this PlayerControl localPlayer)
+    {
+        Coroutines.Start(CoWaitExile(localPlayer));
+    }
+
+    private static IEnumerator CoWaitExile(PlayerControl player)
+    {
+        yield return new WaitForSeconds(1f);
+
+        player.RpcPlayerExile();
+    }
+
+    public static string GetRoleTmpIcon(RoleTypes role)
+    {
+        return GetRoleTmpIcon(RoleManager.Instance.GetRole(role));
+    }
+
+    public static string GetRoleTmpIcon(ICustomRole role)
+    {
+        return role.Configuration.IconTmp ? $"<sprite name=\"{role.Configuration.IconTmp.name}\">" : $"<sprite name=\"AmongUs.Role.{role.Team}\">";
+    }
+
+    public static string GetRoleTmpIcon(RoleBehaviour role)
+    {
+        if (role is ICustomRole custom)
+        {
+            return custom.Configuration.IconTmp ? $"<sprite name=\"{custom.Configuration.IconTmp.name}\">" : $"<sprite name=\"AmongUs.Role.{custom.Team}\">";
+        }
+        return $"<sprite name=\"AmongUs.Role.{role.Role}\">";
+    }
+
+    public static string GetToggledRoleTmpIcon(RoleBehaviour role, bool enabled)
+    {
+        if (!enabled)
+        {
+            return string.Empty;
+        }
+        return GetRoleTmpIcon(role);
+    }
 }
 
 public enum GameUtility
@@ -2277,7 +2537,9 @@ public enum TouGamemode
     Normal,
     HideAndSeek,
     Cultist,
-    // AllKillers,
+    KillFrenzy,
+    TownOfPolus,
+    Other,
     // Legacy
 }
 public enum ExpandedMapNames
@@ -2299,5 +2561,6 @@ public enum BubbleType
     Impostor,
     Vampire,
     Jailor,
+    Jailed,
     Lover
 }

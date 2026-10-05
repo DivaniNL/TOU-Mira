@@ -6,6 +6,7 @@ using MiraAPI.Roles;
 using Reactor.Networking.Attributes;
 using Reactor.Utilities;
 using TownOfUs.Buttons.Impostor;
+using TownOfUs.Options;
 using TownOfUs.Options.Roles.Impostor;
 using UnityEngine;
 
@@ -14,14 +15,11 @@ namespace TownOfUs.Roles.Impostor;
 public sealed class HerbalistRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable
 {
     public DoomableType DoomHintType => DoomableType.Insight;
-    public string LocaleKey => "Herbalist";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Herbalist";
 
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data.Role is not HerbalistRole || Player.HasDied() || !Player.AmOwner ||
+        if (!Player || Player.Data.Role is not HerbalistRole || Player.HasDied() || !Player.AmOwner ||
             MeetingHud.Instance || (!HudManager.Instance.UseButton.isActiveAndEnabled &&
                                     !HudManager.Instance.PetButton.isActiveAndEnabled))
         {
@@ -76,7 +74,7 @@ public sealed class HerbalistRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
     }
     public string GetAdvancedDescription()
     {
-        return TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") + MiscUtils.AppendOptionsText(GetType());
+        return MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") + MiscUtils.AppendOptionsText(GetType());
     }
 
     public Color RoleColor => TownOfUsColors.Impostor;
@@ -85,6 +83,7 @@ public sealed class HerbalistRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Herbalist.LoadAsset(), "TouMira.Role.Impostor.Herbalist", 1.45f),
         UseVanillaKillButton = false,
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
         MaxRoleCount = 1,
@@ -94,17 +93,17 @@ public sealed class HerbalistRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
     [HideFromIl2Cpp]
     public List<CustomButtonWikiDescription> Abilities =>
     [
-        new(TouLocale.GetParsed($"TouRole{LocaleKey}Expose", "Expose"),
-            TouLocale.GetParsed($"TouRole{LocaleKey}ExposeWikiDescription"),
+        new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Expose", "Expose"),
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Expose.WikiDescription"),
             TouImpAssets.HerbExposeSprite),
-        new(TouLocale.GetParsed($"TouRole{LocaleKey}Confuse", "Confuse"),
-            TouLocale.GetParsed($"TouRole{LocaleKey}ConfuseWikiDescription"),
+        new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Confuse", "Confuse"),
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Confuse.WikiDescription"),
             TouImpAssets.HerbConfuseSprite),
-        /*new(TouLocale.GetParsed($"TouRole{LocaleKey}Glamour", "Glamour"),
-            TouLocale.GetParsed($"TouRole{LocaleKey}GlamourWikiDescription"),
+        /*new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Glamour", "Glamour"),
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Glamour.WikiDescription"),
             TouImpAssets.FlashSprite),*/
-        new(TouLocale.GetParsed($"TouRole{LocaleKey}Protect", "Protect"),
-            TouLocale.GetParsed($"TouRole{LocaleKey}ProtectWikiDescription"),
+        new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Protect", "Protect"),
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Protect.WikiDescription"),
             TouImpAssets.HerbProtectSprite)
     ];
 
@@ -122,11 +121,11 @@ public sealed class HerbalistRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOf
             return;
         }
 
-        if (PlayerControl.LocalPlayer.PlayerId == source.PlayerId ||
-            (PlayerControl.LocalPlayer.PlayerId == cleric.PlayerId &&
+        if (source.AmOwner ||
+            (cleric.AmOwner &&
              OptionGroupSingleton<HerbalistOptions>.Instance.AttackNotif))
         {
-            Coroutines.Start(MiscUtils.CoFlash(TownOfUsColors.Cleric));
+            Coroutines.Start(MiscUtils.CoFlash(OptionGroupSingleton<GameMechanicOptions>.Instance.AnonymousShields && !cleric.AmOwner ? TownOfUsColors.NeutralWiki : TownOfUsColors.Cleric));
         }
     }
 }

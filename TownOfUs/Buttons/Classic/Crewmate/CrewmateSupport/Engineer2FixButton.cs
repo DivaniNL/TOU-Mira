@@ -1,24 +1,20 @@
 ﻿using MiraAPI.GameOptions;
-using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities.Extensions;
-using TownOfUs.Modifiers;
-using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Options.Roles.Crewmate;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
 
 namespace TownOfUs.Buttons.Crewmate;
 
-public sealed class EngineerFixButton : TownOfUsRoleButton<EngineerTouRole>
+public sealed class EngineerFixButton : TownOfUsRoleButton<EngineerTouRole>, ILegacyCapable
 {
-    public override string Name => TouLocale.GetParsed("TouRoleEngineerFix", "Fix");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.EngineerFix", "Fix");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Engineer;
     public override float Cooldown => Math.Clamp(MapCooldown, 0.01f, 120f);
     public override float EffectDuration => Math.Clamp(OptionGroupSingleton<EngineerOptions>.Instance.FixDelay.Value, 0.01f, 120f);
     public override int MaxUses => (int)OptionGroupSingleton<EngineerOptions>.Instance.MaxFixes;
-    public override LoadableAsset<Sprite> Sprite => TouCrewAssets.FixButtonSprite;
+    public override LoadableAsset<Sprite> Sprite => LegacyAssets.IsLegacy ? LegacyCrewAssets.FixButtonSprite : TouCrewAssets.FixButtonSprite;
     public override bool ShouldPauseInVent => false;
     public int ExtraUses { get; set; }
 
@@ -29,8 +25,7 @@ public sealed class EngineerFixButton : TownOfUsRoleButton<EngineerTouRole>
 
     public override void ClickHandler()
     {
-        if (!CanClick() || PlayerControl.LocalPlayer.HasModifier<GlitchHackedModifier>() ||
-            PlayerControl.LocalPlayer.GetModifiers<DisabledModifier>().Any(x => !x.CanUseAbilities))
+        if (!CanClick())
         {
             return;
         }
@@ -57,7 +52,7 @@ public sealed class EngineerFixButton : TownOfUsRoleButton<EngineerTouRole>
 
     protected override void OnClick()
     {
-        OverrideName(TouLocale.Get("TouRoleEngineerFixing", "Fixing"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.EngineerFixing", "Fixing"));
         var system = ShipStatus.Instance.Systems[SystemTypes.Sabotage].Cast<SabotageSystemType>();
 
         if (system is not { AnyActive: true })
@@ -68,7 +63,7 @@ public sealed class EngineerFixButton : TownOfUsRoleButton<EngineerTouRole>
 
     public override void OnEffectEnd()
     {
-        OverrideName(TouLocale.Get("TouRoleEngineerFix", "Fix"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.EngineerFix", "Fix"));
         var system = ShipStatus.Instance.Systems[SystemTypes.Sabotage].Cast<SabotageSystemType>();
 
         if (system is { AnyActive: true })
@@ -85,13 +80,10 @@ public sealed class EngineerFixButton : TownOfUsRoleButton<EngineerTouRole>
                 if (TextOutlineColor != Color.clear)
                 {
                     SetTextOutline(TextOutlineColor);
-                    if (Button != null)
-                    {
-                        Button.usesRemainingSprite.color = TextOutlineColor;
-                    }
+                    Button?.usesRemainingSprite.color = TextOutlineColor;
                 }
 
-                TownOfUsColors.UseBasic = LocalSettingsTabSingleton<TownOfUsLocalRoleSettings>.Instance
+                TownOfUsColors.UseBasic = LocalSettingsTabSingleton<TouLocalTabPlayers>.Instance
                     .UseCrewmateTeamColorToggle.Value;
             }
         }

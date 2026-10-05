@@ -1,13 +1,11 @@
 ﻿using AmongUs.GameOptions;
 using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities;
 using System.Globalization;
 using TownOfUs.Interfaces;
 using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Crewmate;
-using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Modules;
 using TownOfUs.Modules.ControlSystem;
 using TownOfUs.Networking;
@@ -36,7 +34,7 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
     public override float Cooldown =>
         Math.Clamp(OptionGroupSingleton<ParasiteOptions>.Instance.OvertakeCooldown + MapCooldown + GetKillCooldownDelta(), 5f, 120f);
     public override float InitialCooldown =>
-        PlayerControl.LocalPlayer != null ? PlayerControl.LocalPlayer.GetKillCooldown() : 10f;
+        PlayerControl.LocalPlayer ? PlayerControl.LocalPlayer.GetKillCooldown() : 10f;
     public override bool ZeroIsInfinite { get; set; } = true;
     public override LoadableAsset<Sprite> Sprite => TouImpAssets.OvertakeSprite;
 
@@ -63,8 +61,8 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
     public override void CreateButton(Transform parent)
     {
         base.CreateButton(parent);
-        _infectName = TouLocale.GetParsed("TouRoleParasiteOvertake", "Overtake");
-        _killName = TouLocale.GetParsed("TouRoleParasiteDecay", "Kill");
+        _infectName = MiraLocaleManager.Get("TownOfUsMira.Role.ParasiteOvertake", "Overtake");
+        _killName = MiraLocaleManager.Get("TownOfUsMira.Role.ParasiteDecay", "Kill");
         OverrideName(_infectName);
 
         _hasCapturedButtonPos = false;
@@ -82,26 +80,21 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
         }
     }
 
-    public override bool Enabled(RoleBehaviour? role)
-    {
-        return role is ParasiteRole;
-    }
-
     public override bool CanUse()
     {
-        if (PlayerControl.LocalPlayer.Data?.Role is not ParasiteRole pr)
+        if (!Role)
         {
             return false;
         }
 
-        if (pr.Controlled != null)
+        if (Role.Controlled != null)
         {
             if (!CanUseWhileControlling())
             {
                 return false;
             }
 
-            var controlled = pr.Controlled;
+            var controlled = Role.Controlled;
             if (controlled == null ||
                 controlled.Data == null ||
                 controlled.HasDied() ||
@@ -115,7 +108,7 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
                 return false;
             }
 
-            if (pr.GetOvertakeKillLockoutRemainingSeconds() > 0f)
+            if (Role.GetOvertakeKillLockoutRemainingSeconds() > 0f)
             {
                 return false;
             }
@@ -127,7 +120,7 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
 
     public override bool CanClick()
     {
-        if (PlayerControl.LocalPlayer?.Data?.Role is ParasiteRole pr && pr.Controlled != null)
+        if (Role && Role.Controlled != null)
         {
             return CanUse();
         }
@@ -137,7 +130,7 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
 
     private static bool CanUseWhileControlling()
     {
-        if (PlayerControl.LocalPlayer == null)
+        if (!PlayerControl.LocalPlayer)
         {
             return false;
         }
@@ -157,8 +150,7 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
             return false;
         }
 
-        if (PlayerControl.LocalPlayer.HasModifier<GlitchHackedModifier>() ||
-            PlayerControl.LocalPlayer.GetModifiers<DisabledModifier>().Any(x => !x.CanUseAbilities))
+        if (PlayerControl.LocalPlayer.GetModifiers<DisabledModifier>().Any(x => !x.CanUseAbilities))
         {
             return false;
         }
@@ -224,7 +216,7 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
             Distance,
             predicate: plr =>
                 plr != null &&
-                plr != PlayerControl.LocalPlayer &&
+                !plr.AmOwner &&
                 !plr.HasDied() &&
                 !plr.IsImpostorAligned() &&
                 !plr.IsInTargetingAnimState() &&
@@ -275,15 +267,9 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
             if (Button.graphic != null)
             {
                 Button.graphic.color = Palette.EnabledColor;
-                if (Button.graphic.material != null)
-                {
-                    Button.graphic.material.SetFloat("_Desat", 0f);
-                }
+                Button.graphic.material?.SetFloat("_Desat", 0f);
             }
-            if (Button.buttonLabelText != null)
-            {
-                Button.buttonLabelText.color = Palette.EnabledColor;
-            }
+            Button.buttonLabelText?.color = Palette.EnabledColor;
         }
     }
 
@@ -313,20 +299,14 @@ public sealed class ParasiteOvertakeButton : TownOfUsKillRoleButton<ParasiteRole
                 ClearAutoDecayCountdownVisual();
             }
 
-            if (Button.graphic != null)
-            {
-                Button.graphic.sprite = TouAssets.KillSprite.LoadAsset();
-            }
+            Button.graphic?.sprite = TouAssets.KillSprite.LoadAsset();
         }
         else
         {
             OverrideName(_infectName);
             ClearAutoDecayCountdownVisual();
 
-            if (Button.graphic != null)
-            {
-                Button.graphic.sprite = TouImpAssets.OvertakeSprite.LoadAsset();
-            }
+            Button.graphic?.sprite = TouImpAssets.OvertakeSprite.LoadAsset();
         }
 
         base.FixedUpdate(playerControl);

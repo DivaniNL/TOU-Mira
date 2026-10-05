@@ -23,7 +23,7 @@ public static class PlayerRoleTextExtensions
         gaModifier => gaModifier.OwnerId == PlayerControl.LocalPlayer.PlayerId;
     
     private static Func<MedicShieldModifier, bool> MedicShieldPredicate { get; } =
-        msModifier => msModifier.Medic.AmOwner;
+        msModifier => msModifier.AllMedics.Contains(PlayerControl.LocalPlayer);
 
     private static Func<OracleBlessedModifier, bool> OracleBlessPredicate { get; } =
         msModifier => msModifier.Oracle.AmOwner;
@@ -121,6 +121,19 @@ public static class PlayerRoleTextExtensions
         }
 
         return color;
+    }
+
+    public static string UpdateAllSymbols(this string name, PlayerControl player, bool hidden = false)
+    {
+        return name.UpdateAllSymbols(player, hidden ? DataVisibility.Hidden : DataVisibility.Dependent);
+    }
+
+    public static string UpdateAllSymbols(this string name, PlayerControl player, DataVisibility visibility)
+    {
+        return name.UpdateTargetSymbols(player, visibility)
+                   .UpdateProtectionSymbols(player, visibility)
+                   .UpdateAllianceSymbols(player, visibility)
+                   .UpdateStatusSymbols(player, visibility);
     }
 
     public static string UpdateTargetSymbols(this string name, PlayerControl player, bool hidden = false)

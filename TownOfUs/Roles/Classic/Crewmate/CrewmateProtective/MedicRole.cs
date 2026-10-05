@@ -11,6 +11,7 @@ using Reactor.Utilities.Extensions;
 using TownOfUs.Buttons.Crewmate;
 using TownOfUs.Modifiers.Crewmate;
 using TownOfUs.Modules;
+using TownOfUs.Options;
 using TownOfUs.Options.Roles.Crewmate;
 using UnityEngine;
 
@@ -22,30 +23,29 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
     public override bool IsAffectedByComms => false;
 
     [HideFromIl2Cpp] public PlayerControl? Shielded { get; set; }
+    public bool IsProtecting { get; set; }
 
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data.Role is not MedicRole)
+        if (!Player || Player.Data.Role is not MedicRole)
         {
             return;
         }
 
-        if (Shielded != null && Shielded.HasDied())
+        var dced = IsProtecting && Shielded == null;
+        if (Shielded != null && Shielded.HasDied() || dced)
         {
-            Clear();
+            Clear(dced);
         }
     }
 
     public DoomableType DoomHintType => DoomableType.Protective;
-    public string LocaleKey => "Medic";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Medic";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -54,12 +54,12 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Shield", "Shield"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}ShieldWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Shield", "Shield"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Shield.WikiDescription"),
                     TouCrewAssets.MedicSprite)
-            };
+            ];
         }
     }
 
@@ -69,6 +69,7 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Medic.LoadAsset(), "TouMira.Role.Crewmate.Medic", 1.45f),
         IntroSound = TouAudio.ScientistIntroSound,
         OptionsScreenshot = TouBanners.MedicRoleBanner,
         Icon = TouRoleIcons.Medic
@@ -87,12 +88,12 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
         return stringB;
     }
 
-    public static string ProtectionString = TouLocale.GetParsed("TouRoleMedicTabProtecting");
+    public static string ProtectionString = MiraLocaleManager.Get("TownOfUsMira.Role.MedicTabProtecting");
 
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        ProtectionString = TouLocale.GetParsed("TouRoleMedicTabProtecting");
+        ProtectionString = MiraLocaleManager.Get("TownOfUsMira.Role.MedicTabProtecting");
 
         if (Player.AmOwner)
         {
@@ -102,22 +103,27 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
                 MeetingAbilityType.Click,
                 TouAssets.LighterSprite,
                 null!,
-                voteArea => { return Player.Data.IsDead || voteArea!.AmDead; },
+                IsExempt,
                 hoverColor: Color.white)
             {
                 Position = new Vector3(1.1f, -0.18f, -3f)
             };
         }
     }
+    public static bool IsExempt(PlayerVoteArea voteArea)
+    {
+        return false;
+    }
 
     public override void OnMeetingStart()
     {
         RoleBehaviourStubs.OnMeetingStart(this);
 
-        if (Player.AmOwner)
+        var meeting = MeetingHud.Instance;
+        if (Player.AmOwner && meeting != null)
         {
-            meetingMenu.GenButtons(MeetingHud.Instance,
-                Player.AmOwner && !Player.HasDied() && !Player.HasModifier<JailedModifier>());
+            meetingMenu.GenButtons(meeting,
+                true);
 
             foreach (var button in meetingMenu.Buttons)
             {
@@ -135,7 +141,7 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
                     continue;
                 }
 
-                var colorType = GetColorTypeForPlayer(player);
+                var colorType = GetColorTypeForPlayer(player.Data.DefaultOutfit.ColorId);
 
                 var renderer = button.Value.GetComponent<SpriteRenderer>();
 
@@ -163,8 +169,19 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
         }
     }
 
-    public void Clear()
+    public void Clear(bool playerLeft = false)
     {
+        if (playerLeft)
+        {
+            IsProtecting = false;
+            Shielded = null;
+            if (Player.AmOwner)
+            {
+                var button = CustomButtonSingleton<MedicShieldButton>.Instance;
+                button.ResetCooldownAndOrEffect();
+                button.SetUses(button.UsesLeft + 1);
+            }
+        }
         SetShieldedPlayer(null);
     }
 
@@ -190,15 +207,24 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
 
     public void SetShieldedPlayer(PlayerControl? player)
     {
+        IsProtecting = false;
         if (Shielded?.TryGetModifier<MedicShieldModifier>(out var mod) == true)
         {
-            // This should prevent any issues with murder attempts
-            mod.StartTimer();
+            mod.RemoveMedic(Player);
         }
-
         Shielded = player;
-
-        Shielded?.AddModifier<MedicShieldModifier>(Player);
+        if (Shielded != null)
+        {
+            IsProtecting = true;
+            if (Shielded.TryGetModifier<MedicShieldModifier>(out var mod2))
+            {
+                mod2.SetNewMedic(Player);
+            }
+            else
+            {
+                Shielded.AddModifier<MedicShieldModifier>(Player);
+            }
+        }
     }
 
     public void Report(byte deadPlayerId)
@@ -240,7 +266,7 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
             return;
         }
 
-        var title = $"<color=#{TownOfUsColors.Medic.ToHtmlStringRGBA()}>{TouLocale.Get("TouRoleMedicMessageTitle")}</color>";
+        var title = $"<color=#{TownOfUsColors.Medic.ToHtmlStringRGBA()}>{MiraLocaleManager.Get("TownOfUsMira.Role.MedicMessageTitle")}</color>";
         var reported = Player;
         if (br.Body != null)
         {
@@ -250,7 +276,7 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
         MiscUtils.AddFakeChat(reported.Data, title, reportMsg, false, true);
     }
 
-    public static string GetColorTypeForPlayer(PlayerControl player)
+    public static string GetColorTypeForPlayer(int colorId)
     {
         var colors = new Dictionary<int, string>
         {
@@ -311,7 +337,7 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
             { 51, "lighter" } // rainbow
         };
 
-        var typeOfColor = colors[player.Data.DefaultOutfit.ColorId];
+        var typeOfColor = colors[colorId];
 
         return typeOfColor;
     }
@@ -319,6 +345,11 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
     public static void DangerAnim()
     {
         Coroutines.Start(MiscUtils.CoFlash(new Color(0f, 0.5f, 0f, 1f)));
+    }
+
+    public static void DangerAnimNonMedic()
+    {
+        Coroutines.Start(MiscUtils.CoFlash(OptionGroupSingleton<GameMechanicOptions>.Instance.AnonymousShields ? TownOfUsColors.NeutralWiki :new Color(0f, 0.5f, 0f, 1f)));
     }
 
     public void LobbyStart()
@@ -377,7 +408,7 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
             MiscUtils.RunAnticheatWarning(source);
             return;
         }
-        if (medic.Data.Role is not MedicRole)
+        if (medic.Data.Role is not MedicRole role)
         {
             Error("RpcMedicShieldAttacked - Invalid medic");
             return;
@@ -401,21 +432,24 @@ public sealed class MedicRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
         }
 
         if (source.AmOwner)
-        {
-            DangerAnim();
+        { 
+            DangerAnimNonMedic();
         }
 
         if (shieldNotify == MedicOption.Everyone && !source.AmOwner)
         {
-            DangerAnim();
+            DangerAnimNonMedic();
         }
 
         var shieldBreaks = OptionGroupSingleton<MedicOptions>.Instance.ShieldBreaks;
 
         if (shieldBreaks)
         {
-            var role = medic.GetRole<MedicRole>();
-            role?.SetShieldedPlayer(null);
+            role.SetShieldedPlayer(null);
+        }
+        else if (shielded.TryGetModifier<MedicShieldModifier>(out var mod))
+        {
+            mod.ShiftNextMedic(medic);
         }
     }
 }

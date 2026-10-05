@@ -1,18 +1,17 @@
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modules.Components;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
 
 namespace TownOfUs.Buttons.Crewmate;
 
-public sealed class ForensicInspectButton : TownOfUsRoleButton<ForensicRole, CrimeSceneComponent>
+public sealed class ForensicInspectButton : TownOfUsRoleButton<ForensicRole, CrimeSceneComponent>, ILegacyCapable
 {
-    public override string Name => TouLocale.GetParsed("TouRoleForensicInspect", "Inspect");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.ForensicInspect", "Inspect");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Forensic;
     public override float Cooldown => Math.Clamp(MapCooldown, 1f, 120f);
-    public override LoadableAsset<Sprite> Sprite => TouCrewAssets.InspectSprite;
+    public override LoadableAsset<Sprite> Sprite => LegacyAssets.IsLegacy ? LegacyCrewAssets.InspectSprite : TouCrewAssets.InspectSprite;
 
     public override CrimeSceneComponent? GetTarget()
     {
@@ -35,7 +34,7 @@ public sealed class ForensicInspectButton : TownOfUsRoleButton<ForensicRole, Cri
         Role.InvestigatingScene = Target;
         Role.InvestigatedPlayers.AddRange(Target.GetScenePlayers());
         var notif1 = Helpers.CreateAndShowNotification(
-            $"{TouLocale.GetParsed("TouRoleForensicInspectNotif").Replace("<player>", $"{TownOfUsColors.Forensic.ToTextColor()}{Target.DeadPlayer!.Data.PlayerName}</color>")}",
+            $"{MiraLocaleManager.Get("TownOfUsMira.Role.ForensicInspectNotif").Replace("<player>", $"{TownOfUsColors.Forensic.ToTextColor()}{Target.DeadPlayer!.Data.PlayerName}</color>")}",
             Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Forensic.LoadAsset());
         notif1.AdjustNotification();
     }

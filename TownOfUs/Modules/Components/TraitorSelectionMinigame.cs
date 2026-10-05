@@ -20,9 +20,9 @@ namespace TownOfUs.Modules.Components;
 [SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1401:Fields should be private", Justification = "Unity")]
 public sealed class TraitorSelectionMinigame(IntPtr cppPtr) : Minigame(cppPtr)
 {
-    public Transform? RolesHolder;
-    public GameObject? RolePrefab;
-    public TextMeshPro? StatusText;
+    public Transform RolesHolder;
+    public GameObject RolePrefab;
+    public TextMeshPro StatusText;
 
     private readonly Color _bgColor = new Color32(6, 0, 0, 215);
     private RoleTypes? _selectedRole;
@@ -43,7 +43,7 @@ public sealed class TraitorSelectionMinigame(IntPtr cppPtr) : Minigame(cppPtr)
 
         StatusText.font = HudManager.Instance.TaskPanel.taskText.font;
         StatusText.fontMaterial = HudManager.Instance.TaskPanel.taskText.fontMaterial;
-        StatusText.text = TouLocale.Get("TouRoleTraitorRoleSelectTitle");
+        StatusText.text = MiraLocaleManager.Get("TownOfUsMira.Role.TraitorRoleSelectTitle");
         StatusText.gameObject.SetActive(false);
     }
 
@@ -68,7 +68,7 @@ public sealed class TraitorSelectionMinigame(IntPtr cppPtr) : Minigame(cppPtr)
 
     private static IEnumerator CoOpen(TraitorSelectionMinigame minigame)
     {
-        while (ExileController.Instance != null)
+        while (ExileController.Instance)
         {
             yield return new WaitForSeconds(0.65f);
         }
@@ -116,7 +116,7 @@ public sealed class TraitorSelectionMinigame(IntPtr cppPtr) : Minigame(cppPtr)
             z++;
         }
 
-        var randomCard = CreateCard(TouLocale.Get("Random"), TouLocale.GetParsed("TouRoleTraitorRandomImpostorCard"), TouRoleIcons.RandomImp.LoadAsset(), z,
+        var randomCard = CreateCard(MiraLocaleManager.Get("Random"), MiraLocaleManager.Get("TownOfUsMira.Role.TraitorRandomImpostorCard"), TouRoleIcons.RandomImp.LoadAsset(), z,
             TownOfUsColors.Impostor);
         randomCard.OnClick.RemoveAllListeners();
         randomCard.OnClick.AddListener((UnityAction)(() =>

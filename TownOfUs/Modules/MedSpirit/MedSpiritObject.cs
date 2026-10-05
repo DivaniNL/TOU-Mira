@@ -17,7 +17,7 @@ using UnityEngine;
 namespace TownOfUs.Modules.MedSpirit;
 
 [RegisterInIl2Cpp]
-public sealed class MedSpiritObject : InnerNetObject
+public sealed class MedSpiritObject(IntPtr cppPtr) : InnerNetObject(cppPtr)
 {
     // Components
     public PlayerControl? Owner { get; private set; }
@@ -36,10 +36,7 @@ public sealed class MedSpiritObject : InnerNetObject
     public float DecelerationRate { get; private set; } = 3.75f;
     public float TurnSharpness { get; private set; } = 10000f;
     public float MaxSpeed { get; private set; }
-
-    public MedSpiritObject(IntPtr cppPtr) : base(cppPtr)
-    {
-    }
+    private bool WasInRewind { get; set; }
 
     public override void ClearOrDecrementDirt()
     {
@@ -179,7 +176,18 @@ public sealed class MedSpiritObject : InnerNetObject
 
     public void SetNormalizedVelocity(Vector2 direction)
     {
-        if (direction.magnitude > 0)
+        var isRewinding = TimeLordRewindSystem.IsRewinding;
+        if (WasInRewind && !isRewinding && Owner != null)
+        {
+            // Once rewind is over, ONLY the spirit should be able to move, not both at the same time.
+            Owner.moveable = false;
+            Owner.MyPhysics.ResetMoveState();
+            Owner.MyPhysics.body.velocity = Vector2.zero;
+            Owner.NetTransform.SetPaused(true);
+            Owner.NetTransform.ClearPositionQueues();
+            Owner.SetKinematic(true);
+        }
+        if (!isRewinding && direction.magnitude > 0)
         {
             CurrentSpeed = Mathf.Min(CurrentSpeed + AccelerationRate * Time.deltaTime, MaxSpeed);
 
@@ -189,6 +197,11 @@ public sealed class MedSpiritObject : InnerNetObject
         {
             Rigidbody.velocity = Vector2.Lerp(Rigidbody.velocity, Vector2.zero, Time.deltaTime * DecelerationRate);
             CurrentSpeed = Mathf.Lerp(CurrentSpeed, 0f, Time.deltaTime * DecelerationRate);
+        }
+
+        if (isRewinding)
+        {
+            WasInRewind = true;
         }
     }
 

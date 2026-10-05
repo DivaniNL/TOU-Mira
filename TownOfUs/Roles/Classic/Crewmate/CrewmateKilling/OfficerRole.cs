@@ -24,15 +24,12 @@ public sealed class OfficerRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
     public int LoadedBullets { get; set; }
     public override bool IsAffectedByComms => false;
     public DoomableType DoomHintType => DoomableType.Fearmonger;
-    public string LocaleKey => "Officer";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Officer";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -41,15 +38,15 @@ public sealed class OfficerRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Load", "Load"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}LoadWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Load", "Load"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Load.WikiDescription"),
                     TouCrewAssets.OfficerLoadSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Shoot", "Shoot"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}ShootWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Shoot", "Shoot"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Shoot.WikiDescription"),
                     TouCrewAssets.OfficerShootSprite)
-            };
+            ];
         }
     }
 
@@ -60,13 +57,14 @@ public sealed class OfficerRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Officer.LoadAsset(), "TouMira.Role.Crewmate.Officer", 1.45f),
         Icon = TouRoleIcons.Officer,
         OptionsScreenshot = TouBanners.CrewmateRoleBanner,
         IntroSound = TouAudio.ImpostorIntroSound
     };
-    public static string RoundTabWaitString = TouLocale.GetParsed("TouRoleOfficerTabAdditionCount");
-    public static string RoundTabWaitNextString = TouLocale.GetParsed("TouRoleOfficerTabAdditionNext");
-    public static string RoundTabBasicTabText = TouLocale.GetParsed("TouRoleOfficerTabAdditionKillBasedInno");
+    public static string RoundTabWaitString = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionCount");
+    public static string RoundTabWaitNextString = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionNext");
+    public static string RoundTabBasicTabText = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionKillBasedInno");
 
     public string RoundWaitString()
     {
@@ -75,20 +73,20 @@ public sealed class OfficerRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        RoundTabWaitString = TouLocale.GetParsed("TouRoleOfficerTabAdditionCount");
-        RoundTabWaitNextString = TouLocale.GetParsed("TouRoleOfficerTabAdditionNext");
+        RoundTabWaitString = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionCount");
+        RoundTabWaitNextString = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionNext");
         var opts = OptionGroupSingleton<OfficerOptions>.Instance;
         if (opts.CanOnlyShootActiveKillers.Value)
         {
-            RoundTabBasicTabText = TouLocale.GetParsed("TouRoleOfficerTabAdditionKillBasedInno");
+            RoundTabBasicTabText = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionKillBasedInno");
         }
         else if (opts.NonKillingNeutralsAreInnocent.Value)
         {
-            RoundTabBasicTabText = TouLocale.GetParsed("TouRoleOfficerTabAdditionMajorityInno");
+            RoundTabBasicTabText = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionMajorityInno");
         }
         else
         {
-            RoundTabBasicTabText = TouLocale.GetParsed("TouRoleOfficerTabAdditionCrewmatesInno");
+            RoundTabBasicTabText = MiraLocaleManager.Get("TownOfUsMira.Role.OfficerTabAdditionCrewmatesInno");
         }
         if (Player.AmOwner)
         {

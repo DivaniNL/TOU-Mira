@@ -1,6 +1,5 @@
 ﻿using MiraAPI.Hud;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Networking;
@@ -10,7 +9,7 @@ namespace TownOfUs.Buttons.Neutral;
 
 public sealed class ExeTormentButton : TownOfUsButton
 {
-    public override string Name => TouLocale.GetParsed("TouRoleExecutionerTorment", "Torment");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.ExecutionerTorment", "Torment");
     public override BaseKeybind Keybind => Keybinds.PrimaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Executioner;
     public override float Cooldown => 0.01f;
@@ -27,7 +26,7 @@ public sealed class ExeTormentButton : TownOfUsButton
 
     protected override void OnClick()
     {
-        if (Minigame.Instance != null)
+        if (Minigame.Instance)
         {
             return;
         }
@@ -39,7 +38,7 @@ public sealed class ExeTormentButton : TownOfUsButton
             PlayerControl.LocalPlayer.cosmetics.currentBodySprite.BodySprite.material;
         playerMenu.Begin(
             plr => !plr.HasDied() && plr.HasModifier<MisfortuneTargetModifier>() &&
-                   !plr.HasModifier<InvulnerabilityModifier>() && plr != PlayerControl.LocalPlayer,
+                   !plr.HasModifier<InvulnerabilityModifier>() && !plr.AmOwner,
             plr =>
             {
                 playerMenu.ForceClose();

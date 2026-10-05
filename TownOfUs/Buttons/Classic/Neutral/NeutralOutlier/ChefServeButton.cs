@@ -1,7 +1,6 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.Hud;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Options.Roles.Neutral;
 using TownOfUs.Roles.Neutral;
@@ -11,7 +10,7 @@ namespace TownOfUs.Buttons.Neutral;
 
 public sealed class ChefServeButton : TownOfUsRoleButton<ChefRole, PlayerControl>
 {
-    public override string Name => TouLocale.GetParsed("TouRoleChefServe", "Serve");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.ChefServe", "Serve");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Chef;
     public override float Cooldown => Math.Clamp(OptionGroupSingleton<ChefOptions>.Instance.ServeCooldown + MapCooldown, 5f, 120f);
@@ -20,7 +19,7 @@ public sealed class ChefServeButton : TownOfUsRoleButton<ChefRole, PlayerControl
     public void UpdateServingType()
     {
         var sprite = TouNeutAssets.ChefServeSprites[0].LoadAsset();
-        if (PlayerControl.LocalPlayer != null && PlayerControl.LocalPlayer.Data != null && PlayerControl.LocalPlayer.Data.Role is ChefRole && Role.StoredBodies.Count > 0)
+        if (PlayerControl.LocalPlayer && PlayerControl.LocalPlayer.Data && PlayerControl.LocalPlayer.Data.Role is ChefRole && Role.StoredBodies.Count > 0)
         {
             sprite = TouNeutAssets.ChefServeSprites[(int)Role.StoredBodies[0].Value].LoadAsset();
         }
@@ -30,10 +29,7 @@ public sealed class ChefServeButton : TownOfUsRoleButton<ChefRole, PlayerControl
     public override void CreateButton(Transform parent)
     {
         base.CreateButton(parent);
-        if (KeybindIcon != null)
-        {
-            KeybindIcon.transform.localPosition = new Vector3(0.4f, 0.45f, -9f);
-        }
+        KeybindIcon?.transform.localPosition = new Vector3(0.4f, 0.45f, -9f);
         UpdateServingType();
     }
 

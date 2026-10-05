@@ -1,6 +1,5 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.Hud;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modules.Components;
 using TownOfUs.Options.Modifiers;
 using UnityEngine;
@@ -9,18 +8,22 @@ namespace TownOfUs.Modifiers.Game.Crewmate;
 
 public sealed class MultitaskerModifier : TouGameModifier, IWikiDiscoverable
 {
-    public override string LocaleKey => "Multitasker";
-    public override string ModifierName => TouLocale.Get($"TouModifier{LocaleKey}");
-    public override string IntroInfo => TouLocale.GetParsed($"TouModifier{LocaleKey}IntroBlurb");
+    public override ModifierUiConfiguration Configuration => new(
+        TownOfUsColors.Multitasker,
+        TmpSpriteUtils.CreateSpriteAsset(TouModifierIcons.Multitasker.LoadAsset(),
+            "TouMira.Modifier.Crewmate.Multitasker", 1.45f));
+    public override string IdPart => "Multitasker";
+    public override string ModifierName => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}");
+    public override string IntroInfo => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.IntroBlurb");
 
     public override string GetDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}TabDescription");
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.TabDescription");
     }
 
     public string GetAdvancedDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}WikiDescription");
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.WikiDescription");
     }
 
     public override LoadableAsset<Sprite>? ModifierIcon => TouModifierIcons.Multitasker;
@@ -47,7 +50,7 @@ public sealed class MultitaskerModifier : TouGameModifier, IWikiDiscoverable
             return;
         }
 
-        if (Minigame.Instance == null || IsExemptTask())
+        if (!Minigame.Instance || IsExemptTask())
         {
             return;
         }

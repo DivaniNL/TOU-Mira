@@ -63,7 +63,7 @@ public sealed class HnsChameleonSwoopModifier : ConcealedModifier, IVisualAppear
 
         var button = CustomButtonSingleton<ChameleonSwoopButton>.Instance;
         button.OverrideSprite(TouCrewAssets.CrewUnswoopSprite.LoadAsset());
-        button.OverrideName(TouLocale.GetParsed("HnsRoleChameleonUnswoop", "Unswoop"));
+        button.OverrideName(MiraLocaleManager.Get("TownOfUsMira.HideAndSeek.Role.ChameleonUnswoop", "Unswoop"));
 
         var touAbilityEvent = new TouAbilityEvent(AbilityType.SwooperSwoop, Player);
         MiraEventManager.InvokeEvent(touAbilityEvent);
@@ -89,8 +89,8 @@ public sealed class HnsChameleonSwoopModifier : ConcealedModifier, IVisualAppear
         {
             var button = CustomButtonSingleton<ChameleonSwoopButton>.Instance;
             button.OverrideSprite(TouCrewAssets.CrewSwoopSprite.LoadAsset());
-            button.OverrideName(TouLocale.GetParsed("HnsRoleChameleonSwoop", "Swoop"));
-            if (MeetingHud.Instance == null)
+            button.OverrideName(MiraLocaleManager.Get("TownOfUsMira.HideAndSeek.Role.ChameleonSwoop", "Swoop"));
+            if (!MeetingHud.Instance)
             {
                 TouAudio.PlaySound(TouAudio.SwooperDeactivateSound);
             }

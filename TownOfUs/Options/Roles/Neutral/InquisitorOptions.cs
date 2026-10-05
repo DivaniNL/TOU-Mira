@@ -6,9 +6,9 @@ using TownOfUs.Roles.Neutral;
 
 namespace TownOfUs.Options.Roles.Neutral;
 
-public sealed class InquisitorOptions : AbstractOptionGroup<InquisitorRole>
+public sealed class InquisitorOptions : AbstractRoleOptionGroup<InquisitorRole>
 {
-    public override string GroupName => TouLocale.Get("TouRoleInquisitor", "Inquisitor");
+    public override string GroupName => MiraLocaleManager.Get("TownOfUsMira.Role.Inquisitor", "Inquisitor");
 
     [ModdedNumberOption("TouOptionInquisitorVanquishCooldown", 5f, 120f, 2.5f, MiraNumberSuffixes.Seconds)]
     public float VanquishCooldown { get; set; } = 25f;
@@ -36,4 +36,7 @@ public sealed class InquisitorOptions : AbstractOptionGroup<InquisitorRole>
 
     public ModdedNumberOption AmountOfHeretics { get; set; } =
         new("TouOptionInquisitorHereticAmount", 3f, 3f, 5f, 1f, MiraNumberSuffixes.None, "0");
+
+    [ModdedToggleOption("TouOptionNeutAnonymousVictoryWin")]
+    public bool InquisAnonymizeWin { get; set; } = false;
 }

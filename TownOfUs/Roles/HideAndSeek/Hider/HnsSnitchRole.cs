@@ -1,6 +1,7 @@
 ﻿using AmongUs.Data;
 using AmongUs.GameOptions;
 using Il2CppInterop.Runtime.Attributes;
+using MiraAPI.GameModes;
 using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
 using MiraAPI.Utilities;
@@ -10,16 +11,18 @@ namespace TownOfUs.Roles.HideAndSeek.Hider;
 
 public sealed class HnsSnitchRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRole, IWikiDiscoverable
 {
-    public string LocaleKey => "Snitch";
-    public string RoleName => TouLocale.Get($"HnsRole{LocaleKey}");
+    public string IdPart => "Snitch";
+    public string IdPrefix => "TownOfUsMira.HideAndSeek.Role";
+    public string RoleName => MiraLocaleManager.Get($"TownOfUsMira.HideAndSeek.Role.{IdPart}");
     public string RoleDescription => "...";
-    public string RoleLongDescription => TouLocale.GetParsed($"HnsRole{LocaleKey}TabDescription");
-    public string RoleHintText => TouLocale.GetParsed($"HnsRole{LocaleKey}TabHint");
+    public string RoleLongDescription => MiraLocaleManager.Get($"TownOfUsMira.HideAndSeek.Role.{IdPart}.TabDescription");
+    public string RoleHintText => MiraLocaleManager.Get($"TownOfUsMira.HideAndSeek.Role.{IdPart}.TabHint");
+    [HideFromIl2Cpp] public bool IsHiddenFromList => MiscUtils.CurrentGamemode() is not TouGamemode.HideAndSeek;
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"HnsRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.HideAndSeek.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -29,7 +32,9 @@ public sealed class HnsSnitchRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOf
 
     public CustomRoleConfiguration Configuration => new(this)
     {
-        /*HideSettings = MiscUtils.CurrentGamemode() is not TouGamemode.HideAndSeek,*/
+        AssociatedGameMode = typeof(HideAndSeekMode),
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Snitch.LoadAsset(), "TouMira.Role.Crewmate.Snitch", 1.45f),
+        HideSettings = MiscUtils.CurrentGamemode() is not TouGamemode.HideAndSeek,
         FreeplayFolder = "Hide n Seek",
         Icon = TouRoleIcons.Snitch,
         RoleHintType = RoleHintType.TaskHint
@@ -44,13 +49,6 @@ public sealed class HnsSnitchRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOf
     {
         // ignore
     }
-
-    [HideFromIl2Cpp] public bool IsHiddenFromList => MiscUtils.CurrentGamemode() is not TouGamemode.HideAndSeek;
-
-    public bool CanSpawnOnCurrentMode() => MiscUtils.CurrentGamemode() is TouGamemode.HideAndSeek;
-
-    [HideFromIl2Cpp]
-    Func<bool> ICustomRole.VisibleInSettings => () => MiscUtils.CurrentGamemode() is TouGamemode.HideAndSeek;
     public override bool IsAffectedByComms => false;
 
     private Vent currentTarget;
@@ -200,21 +198,10 @@ public sealed class HnsSnitchRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOf
     private static readonly ContactFilter2D Filter = Helpers.CreateFilter(Constants.Usables);
     public Vent? GetTarget()
     {
-        var vent = PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance() / 4, Filter);
-        if (vent == null)
-        {
-            vent = PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance() / 3, Filter);
-        }
-
-        if (vent == null)
-        {
-            vent = PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance() / 2, Filter);
-        }
-
-        if (vent == null)
-        {
-            vent = PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance(), Filter);
-        }
+        var vent = PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance() / 4, Filter)
+                ?? PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance() / 3, Filter)
+                ?? PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance() / 2, Filter)
+                ?? PlayerControl.LocalPlayer.GetNearestObjectOfType<Vent>(GetAbilityDistance(), Filter);
 
         if (vent != null && PlayerControl.LocalPlayer.CanUseVent(vent))
         {

@@ -4,7 +4,6 @@ using MiraAPI.Events.Vanilla.Gameplay;
 using MiraAPI.GameOptions;
 using MiraAPI.Hud;
 using MiraAPI.Modifiers;
-using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Impostor.Herbalist;
 using TownOfUs.Options;
 using TownOfUs.Roles.Impostor;
@@ -13,7 +12,7 @@ namespace TownOfUs.Events.Impostor;
 
 public static class HerbalistEvents
 {
-    [RegisterEvent]
+    [RegisterEvent(-800)]
     public static void MiraButtonClickEventHandler(MiraButtonClickEvent @event)
     {
         var button = @event.Button as CustomActionButton<PlayerControl>;
@@ -27,7 +26,7 @@ public static class HerbalistEvents
         CheckForClericBarrier(@event, target, PlayerControl.LocalPlayer);
     }
 
-    [RegisterEvent]
+    [RegisterEvent(-800)]
     public static void MiraButtonCancelledEventHandler(MiraButtonCancelledEvent @event)
     {
         var source = PlayerControl.LocalPlayer;
@@ -42,7 +41,7 @@ public static class HerbalistEvents
         ResetButtonTimer(source, button);
     }
 
-    [RegisterEvent]
+    [RegisterEvent(-800)]
     public static void BeforeMurderEventHandler(BeforeMurderEvent @event)
     {
         var source = @event.Source;
@@ -65,7 +64,8 @@ public static class HerbalistEvents
         if (!target.TryGetModifier<HerbalistProtectionModifier>(out var protectMod) ||
             protectMod.Herbalist.PlayerId == source.PlayerId ||
             target.PlayerId == source.PlayerId ||
-            (source.TryGetModifier<IndirectAttackerModifier>(out var indirect) && indirect.IgnoreShield))
+            @event is BeforeMurderEvent { IgnoreDefense: true } ||
+            @event is ExtendedMiraButtonClickEvent { IgnoreDefense: true })
         {
             return false;
         }

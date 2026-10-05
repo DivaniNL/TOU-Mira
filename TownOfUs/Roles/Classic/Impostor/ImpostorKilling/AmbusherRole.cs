@@ -11,9 +11,9 @@ using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
 using Reactor.Networking.Attributes;
 using TownOfUs.Buttons.Impostor;
-using TownOfUs.Events;
-using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Impostor;
+using TownOfUs.Modules;
+using TownOfUs.Modules.Components;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
@@ -25,18 +25,15 @@ public sealed class AmbusherRole(IntPtr cppPtr)
 {
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<SonarRole>());
     public DoomableType DoomHintType => DoomableType.Fearmonger;
-    public string LocaleKey => "Ambusher";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Ambusher";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
-    public static string PursuingString = TouLocale.GetParsed("TouRoleAmbusherTabPursuingPlayer");
+    public static string PursuingString = MiraLocaleManager.Get("TownOfUsMira.Role.AmbusherTabPursuingPlayer");
 
     public Color RoleColor => TownOfUsColors.Impostor;
     public ModdedRoleTeams Team => ModdedRoleTeams.Impostor;
@@ -45,7 +42,9 @@ public sealed class AmbusherRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Ambusher.LoadAsset(), "TouMira.Role.Impostor.Ambusher", 1.45f),
         Icon = TouRoleIcons.Ambusher,
+        IntroSound = TouAudio.SneakyIntro,
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
         CanUseVent = OptionGroupSingleton<AmbusherOptions>.Instance.CanVent
     };
@@ -55,15 +54,15 @@ public sealed class AmbusherRole(IntPtr cppPtr)
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Pursue", "Pursue"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}PursueWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Pursue", "Pursue"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Pursue.WikiDescription"),
                     TouImpAssets.PursueSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Ambush", "Ambush"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}AmbushWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Ambush", "Ambush"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Ambush.WikiDescription"),
                     TouImpAssets.AmbushSprite)
-            };
+            ];
         }
     }
 
@@ -96,7 +95,7 @@ public sealed class AmbusherRole(IntPtr cppPtr)
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        PursuingString = TouLocale.GetParsed("TouRoleAmbusherTabPursuingPlayer");
+        PursuingString = MiraLocaleManager.Get("TownOfUsMira.Role.AmbusherTabPursuingPlayer");
         CustomButtonSingleton<AmbusherAmbushButton>.Instance.SetActive(false, this);
     }
 
@@ -134,12 +133,9 @@ public sealed class AmbusherRole(IntPtr cppPtr)
             Error("RpcAmbushPlayer - Invalid ambusher");
             return;
         }
-
-        ambusher.AddModifier<IndirectAttackerModifier>(false);
-
         var murderResultFlags = MurderResultFlags.Succeeded;
 
-        var beforeMurderEvent = new BeforeMurderEvent(ambusher, target);
+        var beforeMurderEvent = new BeforeMurderEvent(ambusher, target, true);
         MiraEventManager.InvokeEvent(beforeMurderEvent);
 
         if (beforeMurderEvent.IsCancelled)
@@ -152,15 +148,17 @@ public sealed class AmbusherRole(IntPtr cppPtr)
         if (murderResultFlags2.HasFlag(MurderResultFlags.Succeeded) &&
             murderResultFlags2.HasFlag(MurderResultFlags.DecisionByHost))
         {
-            DeathHandlerModifier.UpdateDeathHandlerImmediate(target, TouLocale.Get("DiedToAmbusherAmbush"),
-                DeathEventHandlers.CurrentRound,
-                DeathHandlerOverride.SetTrue,
-                TouLocale.GetParsed("DiedByStringBasic").Replace("<player>", ambusher.Data.PlayerName),
-                lockInfo: DeathHandlerOverride.SetTrue);
+            GameHistory.UpdatePlayerDeathData(target, MiraLocaleManager.Get("DiedToAmbusherAmbush"), 0, HudManagerHelper.Instance.CurrentRound,
+            DeathHandlerOverride.SetTrue,
+            MiraLocaleManager.Get("DiedByStringBasic").Replace("<player>", ambusher.Data.PlayerName),
+            lockInfo: DeathHandlerOverride.SetTrue, playerState: StoredPlayerState.Dead);
         }
 
         ambusher.CustomMurder(
             target,
+            null,
+            true,
+            false,
             murderResultFlags2,
             true,
             true,

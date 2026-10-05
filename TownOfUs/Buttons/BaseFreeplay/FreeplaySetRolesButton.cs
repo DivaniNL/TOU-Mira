@@ -1,5 +1,4 @@
 ﻿using MiraAPI.Hud;
-using MiraAPI.Utilities.Assets;
 using Reactor.Networking.Rpc;
 using TownOfUs.Networking;
 using TownOfUs.Modules;
@@ -11,7 +10,7 @@ namespace TownOfUs.Buttons.BaseFreeplay;
 
 public sealed class FreeplaySetRolesButton : TownOfUsButton
 {
-    public override string Name => TouLocale.GetParsed("FreeplaySetRoleButton", "Set Roles");
+    public override string Name => MiraLocaleManager.Get("FreeplaySetRoleButton", "Set Roles");
     public override Color TextOutlineColor => new Color32(231, 89, 105, 255);
     public override float Cooldown => 0.001f;
     public override float InitialCooldown => 0.001f;
@@ -24,7 +23,7 @@ public sealed class FreeplaySetRolesButton : TownOfUsButton
 
     public override bool Enabled(RoleBehaviour? role)
     {
-        return PlayerControl.LocalPlayer != null &&
+        return PlayerControl.LocalPlayer &&
                (TutorialManager.InstanceExists || MultiplayerFreeplayMode.Enabled) &&
                !FreeplayButtonsVisibility.Hidden;
     }

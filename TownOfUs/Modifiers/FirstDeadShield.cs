@@ -1,13 +1,10 @@
 using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities.Extensions;
 using TownOfUs.Modules.Anims;
 using TownOfUs.Options;
 using TownOfUs.Patches;
 using TownOfUs.Roles.Other;
-using TownOfUs.Modifiers.Impostor;
-using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Utilities.Appearances;
 using UnityEngine;
 
@@ -15,15 +12,15 @@ namespace TownOfUs.Modifiers;
 
 public sealed class FirstDeadShield : ExcludedGameModifier, IAnimated
 {
-    public override string ModifierName => TouLocale.Get("TouFirstDeathShield", "First Death Shield");
+    public override string ModifierName => MiraLocaleManager.Get("TouFirstDeathShield", "First Death Shield");
     public override LoadableAsset<Sprite>? ModifierIcon => TouModifierIcons.FirstRoundShield;
 
     public override bool HideOnUi =>
-        !LocalSettingsTabSingleton<TownOfUsLocalRoleSettings>.Instance.ShowShieldHudToggle.Value;
+        !LocalSettingsTabSingleton<TouLocalTabButtons>.Instance.ShowShieldHudToggle.Value;
 
     public override Color FreeplayFileColor => new Color32(100, 220, 100, 255);
 
-    public GameObject? FirstRoundShield { get; set; }
+    public GameObject FirstRoundShield { get; set; }
     public bool IsVisible { get; set; } = true;
 
     public void SetVisible()
@@ -78,7 +75,7 @@ public sealed class FirstDeadShield : ExcludedGameModifier, IAnimated
 
     public override string GetDescription()
     {
-        return !HideOnUi ? "You have protection because you died first last game" : string.Empty;
+            return !HideOnUi ? MiraLocaleManager.Get("TouFirstDeathShieldDescription") : string.Empty;
     }
 
     public override void OnActivate()
@@ -97,7 +94,7 @@ public sealed class FirstDeadShield : ExcludedGameModifier, IAnimated
 
     public override void OnDeactivate()
     {
-        if (FirstRoundShield?.gameObject != null)
+        if (FirstRoundShield)
         {
             FirstRoundShield.Destroy();
         }
@@ -105,25 +102,17 @@ public sealed class FirstDeadShield : ExcludedGameModifier, IAnimated
 
     public override void Update()
     {
-        if (!MeetingHud.Instance && FirstRoundShield?.gameObject != null)
+        if (!MeetingHud.Instance && FirstRoundShield)
         {
-            // When morphed/mimicked, match ONLY the visual to the disguise target's First Death Shield state.
+            // When disguised, match ONLY the visual to the disguise target's First Death Shield state.
             // This prevents leaking the real player's metadata while keeping the shield effect unchanged.
             var showAsTarget = true;
-            if (Player.TryGetModifier<MorphlingMorphModifier>(out var morph) && morph.Target != null)
+            if (Player.TryGetModifier<DisguisedModifier>(out var disguise) && disguise.Target != null)
             {
-                showAsTarget = morph.Target.HasModifier<FirstDeadShield>();
-            }
-            else if (Player.TryGetModifier<GlitchMimicModifier>(out var mimic) && mimic.Target != null)
-            {
-                showAsTarget = mimic.Target.HasModifier<FirstDeadShield>();
-            }
-            else if (Player.TryGetModifier<ShapeshifterShiftModifier>(out var shift) && shift.Target != null)
-            {
-                showAsTarget = shift.Target.HasModifier<FirstDeadShield>();
+                showAsTarget = disguise.Target.HasModifier<FirstDeadShield>();
             }
 
-            // Morph/Mimic are implemented as ConcealedModifier, but they are still visible to others.
+            // Morph/Mimic are implemented as DisguisedModifier, but they are still visible to others.
             // Only hide the shield for "true conceal" (e.g. swoop/invis), vents, disabled, etc.
 
             FirstRoundShield.SetActive(Player.IsVisibleToOthers() && IsVisible && showAsTarget);

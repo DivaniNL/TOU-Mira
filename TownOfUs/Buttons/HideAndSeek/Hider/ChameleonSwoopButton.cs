@@ -1,9 +1,7 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.HnsCrewmate;
-using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Options.Roles.HnsCrewmate;
 using TownOfUs.Roles.HideAndSeek.Hider;
 using UnityEngine;
@@ -13,7 +11,7 @@ namespace TownOfUs.Buttons.HideAndSeek.Hider;
 public sealed class ChameleonSwoopButton : TownOfUsRoleButton<HnsChameleonRole>
 {
     public override Color TextOutlineColor => TownOfUsColors.Chameleon;
-    public override string Name => TouLocale.GetParsed("HnsRoleChameleonSwoop", "Swoop");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.HideAndSeek.Role.ChameleonSwoop", "Swoop");
     public override BaseKeybind Keybind => Keybinds.PrimaryAction;
     public override float Cooldown => Math.Clamp(OptionGroupSingleton<HnsChameleonOptions>.Instance.SwoopCooldown + MapCooldown, 5f, 120f);
     public override float EffectDuration => OptionGroupSingleton<HnsChameleonOptions>.Instance.SwoopDuration;
@@ -52,8 +50,7 @@ public sealed class ChameleonSwoopButton : TownOfUsRoleButton<HnsChameleonRole>
             return false;
         }
 
-        if (PlayerControl.LocalPlayer.HasModifier<GlitchHackedModifier>() || PlayerControl.LocalPlayer
-                .GetModifiers<DisabledModifier>().Any(x => !x.CanUseAbilities))
+        if (PlayerControl.LocalPlayer.GetModifiers<DisabledModifier>().Any(x => !x.CanUseAbilities))
         {
             return false;
         }

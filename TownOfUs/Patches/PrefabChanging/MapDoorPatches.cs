@@ -1,6 +1,7 @@
 using HarmonyLib;
 using Hazel;
 using MiraAPI.GameOptions;
+using MiraAPI.Utilities;
 using PowerTools;
 using Reactor.Networking.Attributes;
 using TownOfUs.Modules;
@@ -173,12 +174,12 @@ public static class MapDoorPatches
         {
             if (__instance.infectedOverlay.allButtons.Any(x => x.gameObject.name == "closeDoors"))
             {
-                __instance.infectedOverlay.allButtons.DoIf(x => x.gameObject.name == "closeDoors", x => x.gameObject.Destroy());
+                __instance.infectedOverlay.allButtons.DoIf(x => x.gameObject.name == "closeDoors", x => x.gameObject.DeepDestroy());
             }
 
             if (__instance.infectedOverlay.allButtons.Any(x => x.gameObject.name == "Doors"))
             {
-                __instance.infectedOverlay.allButtons.DoIf(x => x.gameObject.name == "Doors", x => x.gameObject.Destroy());
+                __instance.infectedOverlay.allButtons.DoIf(x => x.gameObject.name == "Doors", x => x.gameObject.DeepDestroy());
             }
         }
     }
@@ -635,7 +636,7 @@ public static class MapDoorPatches
             }
         }
 
-        if (doorType is MapDoorType.Submerged || doorType is MapDoorType.Skeld || doorType is MapDoorType.None)
+        if (doorType is MapDoorType.Submerged)
         {
             return;
         }
@@ -648,12 +649,11 @@ public static class MapDoorPatches
         var doorList = __instance.AllDoors.ToList();
         switch (doorType)
         {
-            // TODO: Add compatibility with the removal of doors if possible, as the game will prevent players from moving because of this Submerged code: https://github.com/SubmergedAmongUs/Submerged/blob/38686ed9d5cf9bf7e90219c05996366ca38b565a/Submerged/SpawnIn/SubmarineSelectSpawn.cs#L432
             case MapDoorType.None:
-                /*doors.DoIf(x => !x.gameObject.name.Contains("Inner") && !x.gameObject.name.Contains("Outer"), x => x.gameObject.Destroy());
+                doors.DoIf(x => !x.gameObject.name.Contains("Inner") && !x.gameObject.name.Contains("Outer"), x => x.gameObject.DeepDestroy());
 
                 __instance.AllDoors = Array.Empty<OpenableDoor>();
-                __instance.Systems.Remove(SystemTypes.Doors);*/
+                // __instance.Systems.Remove(SystemTypes.Doors);
                 return;
             case MapDoorType.Skeld:
                 foreach (var door in doors)
@@ -695,7 +695,7 @@ public static class MapDoorPatches
                 }
 
                 __instance.AllDoors = doorList.ToArray();
-                __instance.Systems.Remove(SystemTypes.Doors);
+                // __instance.Systems.Remove(SystemTypes.Doors);
                 __instance.Systems.Add(SkeldDoorsSystemType.SystemType, new SkeldDoorsSystemType().TryCast<ISystemType>());
 
                 return;

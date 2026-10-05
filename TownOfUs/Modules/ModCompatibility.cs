@@ -6,12 +6,14 @@ using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
 using Il2CppInterop.Runtime;
+using MiraAPI;
+using MiraAPI.Events;
 using MiraAPI.GameOptions;
+using MiraAPI.Hud;
 using MiraAPI.Patches.Hud;
 using Reactor.Utilities;
 using Reactor.Utilities.Extensions;
-using TownOfUs.Events;
-using TownOfUs.Modifiers;
+using TownOfUs.Integrations;
 using TownOfUs.Modules.Components;
 using TownOfUs.Options.Maps;
 using TownOfUs.Roles;
@@ -48,7 +50,7 @@ public static class ModCompatibility
     private static FieldInfo submergedInstance;
     private static FieldInfo submergedElevators;
 
-    public static FieldInfo lastMapID;
+    // public static FieldInfo lastMapID;
 
     private static PropertyInfo currentMap;
     private static PropertyInfo elements;
@@ -56,7 +58,7 @@ public static class ModCompatibility
     private static PropertyInfo liElementType;
     private static PropertyInfo liElementName;
 
-    public static Type MapObjectData;
+    // public static Type MapObjectData;
 
     public static Version SubVersion { get; private set; }
     public static bool SubLoaded { get; private set; }
@@ -109,15 +111,43 @@ public static class ModCompatibility
     public static bool AleLuduLoaded { get; private set; }
     public static BasePlugin AleLuduPlugin { get; private set; }
     public static Assembly AleLuduAssembly { get; private set; }
+
+
+    public const string MciGuid = "auavengers.tou.mci";
+    public static Version MciVersion { get; private set; }
+    public static bool MciLoaded { get; private set; }
+    public static BasePlugin MciPlugin { get; private set; }
+    public static Assembly MciAssembly { get; private set; }
+    
+    /*public const string CorsacGuid = "CorsacCosmetics";
+    public static Version CorsacVersion { get; private set; }
+    public static bool CorsacLoaded { get; private set; }
+    public static BasePlugin CorsacPlugin { get; private set; }
+    public static Assembly CorsacAssembly { get; private set; }
+    public static Type[] CorsacTypes { get; private set; }
+    private static readonly Dictionary<Assembly, string> ResourceBundles = new();
+    public static void AddCorsacResourceBundle(Assembly assembly, string resourcePath)
+    {
+        ResourceBundles.Add(assembly, resourcePath);
+    }*/
+    public const string PerfectCommsGuid = "com.edgetel.perfectcomms";
+    public static readonly Dictionary<Type, List<MiraEventWrapper>> ExposedEventWrappers = [];
+    public static BasePlugin ApiPlugin { get; private set; }
+    public static Assembly ApiAssembly { get; private set; }
+    public static Type[] ApiTypes { get; private set; }
     
     public static void Initialize()
     {
+        InitApiExposing();
         InitBetterAmongUs();
         InitSubmerged();
         InitLevelImpostor();
         InitCrowded();
         InitAleLudu();
+        InitMci();
         InitLaunchpad();
+        // InitCorsac();
+        InitPerfectComms();
 
         var sBuilder = new StringBuilder();
 
@@ -129,13 +159,61 @@ public static class ModCompatibility
         }
 
         InternalModList = sBuilder.ToString();
-        var customSysTypes = new List<SystemTypes>()
+    }
+
+    private static void InitApiExposing()
+    {
+        if (!IL2CPPChainloader.Instance.Plugins.TryGetValue(MiraApiPlugin.Id, out var value))
         {
-            SkeldDoorsSystemType.SystemType,
-            ManualDoorsSystemType.SystemType,
-        };
-        // This allows the custom door types to update properly
-        SystemTypeHelpers.AllTypes = SystemTypeHelpers.AllTypes.Concat(customSysTypes).ToArray();
+            return;
+        }
+
+        ApiPlugin = (value.Instance as BasePlugin)!;
+        ApiAssembly = ApiPlugin.GetType().Assembly;
+        ApiTypes = AccessTools.GetTypesFromAssembly(ApiAssembly);
+        var staticClassType = typeof(MiraEventManager); 
+        var dictField = staticClassType.GetField("EventWrappers", BindingFlags.NonPublic | BindingFlags.Static);
+
+        if (dictField != null)
+        {
+            // 3. Extract the dictionary object from the instance
+            var dictionaryObject = dictField.GetValue(null);
+
+            var dictionary = dictionaryObject as Dictionary<Type, List<MiraEventWrapper>>;
+
+            if (dictionary != null)
+            {
+                Info($"Successfully found api event wrappers");
+                foreach (var pair in dictionary)
+                {
+                    ExposedEventWrappers.Add(pair.Key, pair.Value);
+                }
+            }
+        }
+
+        // This is done to fix locale icons.
+        foreach (var locale in MiraLocaleManager.LangList)
+        {
+            var dict = MiraLocaleManager.Locale[locale.Key];
+            dict["TouOptionDoubleShotAmount.Imp"] = "<sprite name=\"AmongUs.Role.Impostor\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionDoubleShotAmount");
+            dict["TouOptionDoubleShotChance.Imp"] = "<sprite name=\"AmongUs.Role.Impostor\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionDoubleShotChance");
+            dict["TouOptionDoubleShotAmount.Neut"] = "<sprite name=\"AmongUs.Role.Neutral\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionDoubleShotAmount");
+            dict["TouOptionDoubleShotChance.Neut"] = "<sprite name=\"AmongUs.Role.Neutral\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionDoubleShotChance");
+            dict["TouOptionOverclockerAmount.Imp"] = "<sprite name=\"AmongUs.Role.Impostor\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionOverclockerAmount");
+            dict["TouOptionOverclockerChance.Imp"] = "<sprite name=\"AmongUs.Role.Impostor\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionOverclockerChance");
+            dict["TouOptionOverclockerAmount.Neut"] = "<sprite name=\"AmongUs.Role.Neutral\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionOverclockerAmount");
+            dict["TouOptionOverclockerChance.Neut"] = "<sprite name=\"AmongUs.Role.Neutral\"> " + MiraLocaleManager.Get(locale.Key, "TouOptionOverclockerChance");
+        }
+    }
+    
+    private static void InitPerfectComms()
+    {
+        if (!IL2CPPChainloader.Instance.Plugins.ContainsKey(PerfectCommsGuid))
+        {
+            return;
+        }
+
+        PerfectCommsRuntime.Register();
     }
 
 #pragma warning disable S3011
@@ -198,6 +276,30 @@ public static class ModCompatibility
         harmony.Patch(detConstruct, new HarmonyMethod(AccessTools.Method(compatType, nameof(AdjustRoleBehaviour))));
     }
 #pragma warning restore S3011
+    /*public static void InitCorsac()
+    {
+        if (!IL2CPPChainloader.Instance.Plugins.TryGetValue(CorsacGuid, out var plugin))
+        {
+            return;
+        }
+
+        CorsacPlugin = (plugin!.Instance as BasePlugin)!;
+        CorsacVersion = plugin.Metadata.Version;
+
+        CorsacAssembly = CorsacPlugin.GetType().Assembly;
+        CorsacTypes = AccessTools.GetTypesFromAssembly(CorsacAssembly);
+        var bundleLoader = CorsacTypes.First(t => t.Name == "BundleLoader");
+        var addResourceHandler = AccessTools.Method(bundleLoader, "AddResourceBundle", [typeof(Assembly), typeof(string)]);
+        if (ResourceBundles.HasAny())
+        {
+            foreach (var pair in ResourceBundles)
+            {
+                addResourceHandler.Invoke(null, [pair.Key, pair.Value]);
+            }
+        }
+        CorsacLoaded = true;
+        Message("Corsac Cosmetics was detected");
+    }*/
 
     public static void InitSubmerged()
     {
@@ -253,6 +355,9 @@ public static class ModCompatibility
 
         SubmarineSurvillanceMinigameType = SubTypes.FirstOrDefault(t => t.Name == "SubmarineSurvillanceMinigame")!;
         SubmarineSecuritySabotageSystemType = SubTypes.FirstOrDefault(t => t.Name == "SubmarineSecuritySabotageSystem")!;
+        
+        var floorButtonPatch = SubTypes.First(t => t.Name == "ChangeFloorButtonPatches");
+        var floorButtonStyleMethod = AccessTools.Method(floorButtonPatch, "SetButtonStyle", [typeof(bool)]);
 
         var types = new[] { typeof(float) };
         var oxyConstruct = submarineOxygenSystem.GetConstructor(
@@ -276,10 +381,33 @@ public static class ModCompatibility
         harmony.Patch(oxyConstruct, null,
             new HarmonyMethod(AccessTools.Method(compatType, nameof(SetOxygenDuration))));
         harmony.Patch(canUse, null, null,
-            new HarmonyMethod(typeof(ModCompatibility), nameof(SubmergedElevatorTranspilerPatch)));
+            new HarmonyMethod(compatType, nameof(SubmergedElevatorTranspilerPatch)));
+        harmony.Patch(floorButtonStyleMethod,
+            new HarmonyMethod(AccessTools.Method(compatType, nameof(FloorStylePrefix))));
 
         SubLoaded = true;
         Message("Submerged was detected");
+    }
+
+    public static bool FloorStylePrefix(bool isMovingUp)
+    {
+        var hoverRend = MiraHudHelper.SubmergedFloorButtonRendererHover;
+        var basicRend = MiraHudHelper.SubmergedFloorButtonRenderer;
+        if (basicRend && hoverRend)
+        {
+            if (isMovingUp)
+            {
+                basicRend.sprite = TouAssets.SubmergedFloorUp.LoadAsset();
+                hoverRend.sprite = TouAssets.SubmergedFloorUpHover.LoadAsset();
+            }
+            else
+            {
+                basicRend.sprite = TouAssets.SubmergedFloorDown.LoadAsset();
+                hoverRend.sprite = TouAssets.SubmergedFloorDownHover.LoadAsset();
+            }
+        }
+
+        return false;
     }
 
     public static IEnumerable<CodeInstruction> SubmergedElevatorTranspilerPatch(
@@ -385,8 +513,8 @@ public static class ModCompatibility
 
     public static void OxygenDeathPostfix(PlayerControl player)
     {
-        DeathHandlerModifier.UpdateDeathHandlerImmediate(player, TouLocale.Get("DiedToSubmergedOxygen"),
-        DeathEventHandlers.CurrentRound, DeathHandlerOverride.SetTrue,
+        GameHistory.UpdatePlayerDeathData(player.PlayerId, MiraLocaleManager.Get("DiedToSubmergedOxygen"),
+            0f, HudManagerHelper.Instance.CurrentRound, DeathHandlerOverride.SetTrue,
         lockInfo: DeathHandlerOverride.SetTrue);
     }
 
@@ -581,9 +709,9 @@ public static class ModCompatibility
 
         LITypes = AccessTools.GetTypesFromAssembly(LIAssembly);
 
-        var mapLoader = LITypes.First(x => x.Name == "MapLoader");
-        lastMapID = AccessTools.Field(mapLoader, "_lastMapID");
-        currentMap = AccessTools.Property(mapLoader, "CurrentMap");
+        var gameConfig = LITypes.First(x => x.Name == "GameConfiguration");
+        //lastMapID = AccessTools.Field(gameConfig, "_lastMapID"); // Unused? (Also, only accessible through CurrentMap.ID)
+        currentMap = AccessTools.Property(gameConfig, "CurrentMap");
 
         var liMap = LITypes.First(x => x.Name == "LIMap");
         elements = AccessTools.Property(liMap, "elements");
@@ -598,7 +726,7 @@ public static class ModCompatibility
         var console = LITypes.First(x => x.Name == "TriggerConsole");
         var canUseMethod = AccessTools.Method(console, "CanUse");
 
-        MapObjectData = LITypes.First(x => x.Name == "MapObjectData");
+        // MapObjectData = LITypes.First(x => x.Name == "MapObjectData");
 
         var compatType = typeof(ModCompatibility);
         var harmony = new Harmony("tou.levelimposter.patch");
@@ -670,6 +798,21 @@ public static class ModCompatibility
 
         AleLuduLoaded = true;
         Message("AleLuduMod was detected");
+    }
+
+    private static void InitMci()
+    {
+        if (!IL2CPPChainloader.Instance.Plugins.TryGetValue(MciGuid, out var value))
+        {
+            return;
+        }
+
+        MciPlugin = (value.Instance as BasePlugin)!;
+        MciAssembly = MciPlugin.GetType().Assembly;
+        MciVersion = value.Metadata.Version;
+
+        MciLoaded = true;
+        Message("ToU MCI was detected.");
     }
 
     public static string GetLIVentType(Vent vent)

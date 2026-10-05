@@ -3,7 +3,6 @@ using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Networking;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities;
 using TownOfUs.Modifiers.Game.Alliance;
 using TownOfUs.Modules;
@@ -14,9 +13,9 @@ using UnityEngine;
 
 namespace TownOfUs.Buttons.Crewmate;
 
-public sealed class AltruistSacrificeButton : TownOfUsRoleButton<AltruistRole, DeadBody>
+public sealed class AltruistSacrificeButton : TownOfUsRoleButton<AltruistRole, DeadBody>, ILegacyCapable
 {
-    public override string Name => TouLocale.GetParsed("TouRoleAltruistRevive", "Revive");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.AltruistRevive", "Revive");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Altruist;
     public override float Cooldown => Math.Clamp(MapCooldown, 0.001f, 120f);
@@ -25,7 +24,7 @@ public sealed class AltruistSacrificeButton : TownOfUsRoleButton<AltruistRole, D
     public override int MaxUses => OptionGroupSingleton<AltruistOptions>.Instance.KillOnStartRevive.Value
         ? 0
         : (int)OptionGroupSingleton<AltruistOptions>.Instance.MaxRevives;
-    public override LoadableAsset<Sprite> Sprite => TouCrewAssets.ReviveSprite;
+    public override LoadableAsset<Sprite> Sprite => LegacyAssets.IsLegacy ? LegacyCrewAssets.ReviveSprite : TouCrewAssets.ReviveSprite;
     public override bool UsableInDeath => true;
 
     public override DeadBody? GetTarget()
@@ -68,12 +67,12 @@ public sealed class AltruistSacrificeButton : TownOfUsRoleButton<AltruistRole, D
             return false;
         }
 
-        return PlayerControl.LocalPlayer != null && PlayerControl.LocalPlayer.GetRoleWhenAlive() is AltruistRole;
+        return PlayerControl.LocalPlayer && PlayerControl.LocalPlayer.GetRoleWhenAlive() is AltruistRole;
     }
 
     public override bool CanUse()
     {
-        if (PlayerControl.LocalPlayer != null && PlayerControl.LocalPlayer.HasDied())
+        if (PlayerControl.LocalPlayer && PlayerControl.LocalPlayer.HasDied())
         {
             return false;
         }
@@ -88,7 +87,7 @@ public sealed class AltruistSacrificeButton : TownOfUsRoleButton<AltruistRole, D
 
     public override void ClickHandler()
     {
-        if (PlayerControl.LocalPlayer != null && PlayerControl.LocalPlayer.HasDied())
+        if (PlayerControl.LocalPlayer && PlayerControl.LocalPlayer.HasDied())
         {
             return;
         }
@@ -150,20 +149,20 @@ public sealed class AltruistSacrificeButton : TownOfUsRoleButton<AltruistRole, D
             Coroutines.Start(AltruistReviveButton.CoKillOnStart(PlayerControl.LocalPlayer));
         }
 
-        OverrideName(TouLocale.Get("TouRoleAltruistReviving", "Reviving"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.AltruistReviving", "Reviving"));
     }
 
     public override void OnEffectEnd()
     {
         RevivedInRound = true;
-        OverrideName(TouLocale.Get("TouRoleAltruistRevive", "Revive"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.AltruistRevive", "Revive"));
         Coroutines.Start(CoSacrifite(PlayerControl.LocalPlayer));
     }
 
     public static IEnumerator CoSacrifite(PlayerControl player)
     {
         yield return new WaitForSeconds(0.01f);
-        if (MeetingHud.Instance == null && ExileController.Instance == null && !player.HasDied())
+        if (!MeetingHud.Instance && !ExileController.Instance && !player.HasDied())
         {
             player.RpcCustomMurder(player, MeetingCheck.OutsideMeeting, showKillAnim: false, createDeadBody: false);
         }

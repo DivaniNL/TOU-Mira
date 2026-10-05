@@ -7,6 +7,7 @@ using MiraAPI.Utilities;
 using Reactor.Networking.Attributes;
 using Reactor.Networking.Rpc;
 using TownOfUs.Events.TouEvents;
+using TownOfUs.Interfaces;
 using TownOfUs.Modifiers.Game.Crewmate;
 using TownOfUs.Modifiers.Impostor;
 using TownOfUs.Modules;
@@ -16,26 +17,26 @@ using UnityEngine;
 
 namespace TownOfUs.Roles.Crewmate;
 
-public sealed class TimeLordRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable
+public sealed class TimeLordRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable, IRewindImmune
 {
     public override bool IsAffectedByComms => false;
+    public bool IgnoredByRewind => false;
+    public bool IgnoredByRecording => false;
     public DoomableType DoomHintType => DoomableType.Perception;
 
-    public string LocaleKey => "TimeLord";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}", "Time Lord");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "TimeLord";
+    public string RoleName => MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}", "Time Lord");
 
     public string GetAdvancedDescription()
     {
-        return TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") + MiscUtils.AppendOptionsText(GetType());
+        return MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") + MiscUtils.AppendOptionsText(GetType());
     }
 
     [HideFromIl2Cpp]
     public List<CustomButtonWikiDescription> Abilities =>
     [
-        new(TouLocale.GetParsed($"TouRole{LocaleKey}Rewind", "Rewind"),
-            TouLocale.GetParsed($"TouRole{LocaleKey}RewindWikiDescription"),
+        new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Rewind", "Rewind"),
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Rewind.WikiDescription"),
             TouCrewAssets.RewindSprite)
     ];
 
@@ -45,6 +46,7 @@ public sealed class TimeLordRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.TimeLord.LoadAsset(), "TouMira.Role.Crewmate.TimeLord", 1.45f),
         Icon = TouRoleIcons.TimeLord,
         OptionsScreenshot = TouBanners.CrewmateRoleBanner,
         MaxRoleCount = 1,
@@ -52,7 +54,7 @@ public sealed class TimeLordRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
     };
 
     [MethodRpc((uint)TownOfUsRpc.TimeLordRewind)]
-    public static void RpcStartRewind(PlayerControl timeLord)
+    public static void RpcStartRewind(PlayerControl timeLord, float duration)
     {
         if (LobbyBehaviour.Instance)
         {
@@ -73,25 +75,25 @@ public sealed class TimeLordRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
             return;
         }
 
-        if (PlayerControl.LocalPlayer != null)
+        if (PlayerControl.LocalPlayer)
         {
             try
             {
                 var notif = Helpers.CreateAndShowNotification(
-                    $"<b>{TownOfUsColors.TimeLord.ToTextColor()}{TouLocale.GetParsed("TouRoleTimeLordRewindNotif", "Time is being rewound!")}</color></b>",
+                    $"<b>{TownOfUsColors.TimeLord.ToTextColor()}{MiraLocaleManager.Get("TownOfUsMira.Role.TimeLordRewindNotif", "Time is being rewound!")}</color></b>",
                     Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.TimeLord.LoadAsset());
                 notif.AdjustNotification();
+                notif.alphaTimer = duration + 1f;
             }
             catch
             {
                // ignored
             }
         }
+        var history = Math.Clamp(OptionGroupSingleton<TimeLordOptions>.Instance.RewindHistorySeconds, 1f, 15f);
 
-        const float duration = 3.5f; var history = Math.Clamp(OptionGroupSingleton<TimeLordOptions>.Instance.RewindHistorySeconds, 0.25f, 120f);
-
-        if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost &&
-OptionGroupSingleton<TimeLordOptions>.Instance.ReviveOnRewind)
+        if (AmongUsClient.Instance && AmongUsClient.Instance.AmHost &&
+(RewindRevive)OptionGroupSingleton<TimeLordOptions>.Instance.ReviveOnRewind.Value != RewindRevive.Disabled)
         {
             var now = DateTime.UtcNow;
             var cutoff = now - TimeSpan.FromSeconds(history);
@@ -114,7 +116,7 @@ OptionGroupSingleton<TimeLordOptions>.Instance.ReviveOnRewind)
             TimeLordRewindSystem.ConfigureHostRevives(null);
         }
 
-        if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost &&
+        if (AmongUsClient.Instance && AmongUsClient.Instance.AmHost &&
 OptionGroupSingleton<TimeLordOptions>.Instance.UndoTasksOnRewind)
         {
             TimeLordRewindSystem.ConfigureHostTaskUndosFromHistory(duration, history);
@@ -124,11 +126,11 @@ OptionGroupSingleton<TimeLordOptions>.Instance.UndoTasksOnRewind)
             TimeLordRewindSystem.ConfigureHostTaskUndos(null);
         }
 
-        if (AmongUsClient.Instance != null && AmongUsClient.Instance.AmHost)
+        if (AmongUsClient.Instance && AmongUsClient.Instance.AmHost)
         {
             foreach (var drag in ModifierUtils.GetActiveModifiers<DragModifier>().ToList())
             {
-                if (drag?.Player == null || drag.DeadBody == null)
+                if (!drag.Player || drag.DeadBody == null)
                 {
                     continue;
                 }

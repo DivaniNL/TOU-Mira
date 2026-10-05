@@ -17,16 +17,15 @@ public static class BucketTooltipData
         public Color Col = col;
     }
 
-    public readonly struct TooltipInfo
+    public readonly struct TooltipInfo(BucketTooltipData.RoleEntry[] roles)
     {
-        internal readonly RoleEntry[] Roles;
-        public TooltipInfo(RoleEntry[] roles) { Roles = roles; }
+        internal readonly RoleEntry[] Roles = roles;
     }
 
     // ── All possible roles per bucket ─────────────────────────────────────────
     public static Dictionary<RoleListOption, RoleEntry[]> AllRoles => _allRoles;
 
-    private static readonly Dictionary<RoleListOption, RoleEntry[]> _allRoles = new();
+    private static readonly Dictionary<RoleListOption, RoleEntry[]> _allRoles = [];
 
     // Group buckets map to multiple specific buckets
     private static readonly Dictionary<RoleListOption, RoleListOption[]> _groupBuckets = new()
@@ -97,17 +96,15 @@ public static class BucketTooltipData
         if (_groupBuckets.TryGetValue(bucket, out var grouped))
         {
             buckets = grouped;
-            Warning($"Groups Buckets contain data!");
         }
         else if (_allRoles.ContainsKey(bucket))
         {
             buckets = [ bucket ];
-            Warning($"All Roles contains the bucket!");
         }
         else
         {
             Error($"Bucket missing!");
-            return System.Array.Empty<RoleEntry>();
+            return [];
         }
 
         var result = new List<RoleEntry>();
@@ -128,7 +125,6 @@ public static class BucketTooltipData
             foreach (var role in allRoles)
             {
                 var entry = entries.FirstOrDefault(x => x.RoleId == role.Role);
-                Info($"Found {role.GetRoleName()}!");
                 if (entry == null)
                 {
                     Error("Missing entry...");
@@ -137,11 +133,14 @@ public static class BucketTooltipData
 
                 entry.DisplayName = role.GetRoleName();
                 entry.Col = role.TeamColor;
-                if (role is ICustomRole customRole && customRole.Configuration.MaxRoleCount != 0 && (int)customRole.GetCount()! > 0 &&
-                    (int)customRole.GetChance()! > 0)
+                if (role is ICustomRole customRole)
                 {
-                    result.Add(entry);
-                    Warning($"Added {entry.DisplayName} as custom role!");
+                    var count = customRole.GetCount() ?? 0;
+                    var chance = customRole.GetChance() ?? 0;
+                    if (customRole.Configuration.MaxRoleCount != 0 && count > 0 && chance > 0)
+                    {
+                        result.Add(entry);
+                    }
                 }
                 else
                 {
@@ -151,7 +150,6 @@ public static class BucketTooltipData
                     if (roleOptions.GetNumPerGame(role.Role) > 0 && roleOptions.GetChancePerGame(role.Role) > 0)
                     {
                         result.Add(entry);
-                        Warning($"Added {entry.DisplayName} as vanilla role!");
                     }
                 }
             }

@@ -1,6 +1,8 @@
 ﻿using AmongUs.GameOptions;
 using Il2CppInterop.Runtime.Attributes;
+using MiraAPI.Modifiers;
 using MiraAPI.Roles;
+using TownOfUs.Modifiers.Game.Assailant;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
 
@@ -11,15 +13,19 @@ public sealed class WarlockRole(IntPtr cppPtr)
 {
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<VeteranRole>());
     public DoomableType DoomHintType => DoomableType.Relentless;
-    public string LocaleKey => "Warlock";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Warlock";
+    public string RoleMedDescriptionLocale => $"TownOfUsMira.Role.{IdPart}.TabDescription";
+
+    [HideFromIl2Cpp]
+    public bool IsModifierApplicable(BaseModifier modifier)
+    {
+        return modifier is not OverclockerModifier;
+    }
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -29,6 +35,7 @@ public sealed class WarlockRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Warlock.LoadAsset(), "TouMira.Role.Impostor.Warlock", 1.45f),
         UseVanillaKillButton = false,
         IntroSound = TouAudio.WarlockIntroSound,
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
@@ -40,12 +47,12 @@ public sealed class WarlockRole(IntPtr cppPtr)
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}BurstKill", "Burst Kill"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}KillWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}BurstKill", "Burst Kill"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Kill.WikiDescription"),
                     TouAssets.KillSprite)
-            };
+            ];
         }
     }
 }

@@ -29,12 +29,12 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
 {
     public override void SpawnTaskHeader(PlayerControl playerControl)
     {
-        if (playerControl != PlayerControl.LocalPlayer)
+        if (!playerControl.AmOwner)
         {
             return;
         }
         ImportantTextTask orCreateTask = PlayerTask.GetOrCreateTask<ImportantTextTask>(playerControl, 0);
-        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{TouLocale.GetParsed("NeutralBenignTaskHeader")}</color>";
+        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{MiraLocaleManager.Get("NeutralBenignTaskHeader")}</color>";
         orCreateTask.name = "NeutralRoleText";
     }
 
@@ -44,7 +44,7 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
 
     public void AssignTargets()
     {
-        if (!OptionGroupSingleton<RoleOptions>.Instance.IsClassicRoleAssignment)
+        if (!RoleOptions.IsClassicRoleAssignment)
         {
             return;
         }
@@ -93,21 +93,20 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
     }
 
     public DoomableType DoomHintType => DoomableType.Protective;
-    public string LocaleKey => "Fairy";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
+    public string IdPart => "Fairy";
     public string RoleDescription => TargetString(true);
     public string RoleLongDescription => TargetString();
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription")
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription")
                 .Replace("<symbol>", "<color=#B3FFFFFF>★</color>") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
-    private static string _missingTargetDesc = TouLocale.GetParsed("TouRoleFairyIfNoTarget");
-    private static string _targetDesc = TouLocale.GetParsed("TouRoleFairyTabDescription");
+    private static string _missingTargetDesc = MiraLocaleManager.Get("TownOfUsMira.Role.FairyIfNoTarget");
+    private static string _targetDesc = MiraLocaleManager.Get("TownOfUsMira.Role.Fairy.TabDescription");
 
     private string TargetString(bool capitalize = false)
     {
@@ -127,6 +126,7 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Fairy.LoadAsset(), "TouMira.Role.Neutral.Fairy", 1.45f),
         Icon = TouRoleIcons.Fairy,
         IntroSound = TouAudio.GuardianAngelSound,
         OptionsScreenshot = TouBanners.NeutralRoleBanner,
@@ -138,7 +138,7 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
     public bool SetupIntroTeam(IntroCutscene instance,
         ref Il2CppSystem.Collections.Generic.List<PlayerControl> yourTeam)
     {
-        if (Player != PlayerControl.LocalPlayer)
+        if (!Player.AmOwner)
         {
             return true;
         }
@@ -161,20 +161,20 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Protect", "Protect"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}ProtectWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Protect", "Protect"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Protect.WikiDescription"),
                     TouNeutAssets.ProtectSprite)
-            };
+            ];
         }
     }
 
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        _missingTargetDesc = TouLocale.GetParsed("TouRoleFairyIfNoTarget");
-        _targetDesc = TouLocale.GetParsed("TouRoleFairyTabDescription");
+        _missingTargetDesc = MiraLocaleManager.Get("TownOfUsMira.Role.FairyIfNoTarget");
+        _targetDesc = MiraLocaleManager.Get("TownOfUsMira.Role.Fairy.TabDescription");
 
         if (TutorialManager.InstanceExists && Target == null && PlayerControl.LocalPlayer.IsHost() &&
             AmongUsClient.Instance.GameState != InnerNetClient.GameStates.Started)
@@ -224,8 +224,7 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
     public static bool FairySeesRoleVisibilityFlag(PlayerControl player)
     {
         var gaKnowsTargetRole = OptionGroupSingleton<FairyOptions>.Instance.FairyKnowsTargetRole &&
-                                PlayerControl.LocalPlayer.IsRole<FairyRole>() &&
-                                PlayerControl.LocalPlayer.GetRole<FairyRole>()!.Target == player;
+                                PlayerControl.LocalPlayer.Data.Role is FairyRole fairy && fairy.Target == player;
 
         return gaKnowsTargetRole;
     }
@@ -236,8 +235,7 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
             OptionGroupSingleton<FairyOptions>.Instance.ShowProtect is ProtectOptions.SelfAndFairy &&
             player.HasModifier<GuardianAngelTargetModifier>();
 
-        var gaKnowsTargetRole = PlayerControl.LocalPlayer.IsRole<FairyRole>() &&
-                                PlayerControl.LocalPlayer.GetRole<FairyRole>()!.Target == player;
+        var gaKnowsTargetRole = PlayerControl.LocalPlayer.Data.Role is FairyRole fairy && fairy.Target == player;
 
         return gaTargetKnows || gaKnowsTargetRole;
     }
@@ -268,7 +266,7 @@ public sealed class FairyRole(IntPtr cppPtr) : NeutralRole(cppPtr), ITownOfUsRol
 
             Player.ChangeRole(roleType);
 
-            if ((roleType == RoleId.Get<JesterRole>() && OptionGroupSingleton<JesterOptions>.Instance.ScatterOn) ||
+            if ((roleType == RoleId.Get<JesterRole>() && OptionGroupSingleton<JesterOptions>.Instance.ScatterOn.Value) ||
                 (roleType == RoleId.Get<SurvivorRole>() && OptionGroupSingleton<SurvivorOptions>.Instance.ScatterOn))
             {
                 StartCoroutine(Effects.Lerp(0.2f,

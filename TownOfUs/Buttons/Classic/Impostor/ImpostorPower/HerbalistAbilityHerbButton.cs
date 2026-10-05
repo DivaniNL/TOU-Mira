@@ -2,10 +2,7 @@ using System.Globalization;
 using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
-using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Impostor.Herbalist;
-using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Options;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Impostor;
@@ -15,8 +12,8 @@ namespace TownOfUs.Buttons.Impostor;
 
 public sealed class HerbalistAbilityHerbButton : TownOfUsRoleButton<HerbalistRole, PlayerControl>
 {
-    public override string Name => "Kill";
-    public string CurrentName = "Kill";
+    public override string Name => CurrentName;
+    public string CurrentName = string.Empty;
     public override BaseKeybind Keybind => Keybinds.PrimaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Impostor;
     public override float Cooldown => Math.Clamp(OptionGroupSingleton<HerbalistOptions>.Instance.HerbCooldown + MapCooldown, 5f, 120f);
@@ -28,17 +25,13 @@ public sealed class HerbalistAbilityHerbButton : TownOfUsRoleButton<HerbalistRol
 
     public int CurrentHerbUses()
     {
-        switch (CurrentAbility)
+        return CurrentAbility switch
         {
-            case HerbAbilities.Expose:
-                return ExposeUsesLeft;
-            case HerbAbilities.Confuse:
-                return ConfuseUsesLeft;
-            case HerbAbilities.Protect:
-                return ProtectUsesLeft;
-        }
-
-        return -1;
+            HerbAbilities.Expose => ExposeUsesLeft,
+            HerbAbilities.Confuse => ConfuseUsesLeft,
+            HerbAbilities.Protect => ProtectUsesLeft,
+            _ => -1,
+        };
     }
 
     public bool CurrentHerbsLimited => CurrentHerbUses() != -1;
@@ -48,8 +41,7 @@ public sealed class HerbalistAbilityHerbButton : TownOfUsRoleButton<HerbalistRol
 
     public override void ClickHandler()
     {
-        if (CanClick() && !PlayerControl.LocalPlayer.HasModifier<GlitchHackedModifier>() &&
-            !PlayerControl.LocalPlayer.HasModifier<DisabledModifier>())
+        if (CanClick())
         {
             if (CurrentHerbsLimited)
             {
@@ -106,27 +98,30 @@ public sealed class HerbalistAbilityHerbButton : TownOfUsRoleButton<HerbalistRol
     public override LoadableAsset<Sprite> Sprite => HerbButtons[0];
     public HerbAbilities CurrentAbility = HerbAbilities.Kill;
 
-    public static List<LoadableAsset<Sprite>> HerbButtons { get; set; } = new()
-    {
+    public static List<LoadableAsset<Sprite>> HerbButtons { get; set; } =
+    [
         TouAssets.KillSprite,
         TouImpAssets.HerbExposeSprite,
         TouImpAssets.HerbConfuseSprite,
         TouImpAssets.HerbProtectSprite,
-    };
+    ];
 
-    public static List<string> ProtectionText { get; set; } = new()
-    {
-        "Kill",
-        "Expose",
-        "Confuse",
-        "Protect",
-    };
+    public static List<string> ProtectionText =>
+    [
+        TranslationController.Instance.GetStringWithDefault(StringNames.KillLabel, "Kill"),
+        MiraLocaleManager.Get("TownOfUsMira.Role.HerbalistExpose"),
+        MiraLocaleManager.Get("TownOfUsMira.Role.HerbalistConfuse"),
+        MiraLocaleManager.Get("TownOfUsMira.Role.HerbalistProtect"),
+    ];
 
     public override void CreateButton(Transform parent)
     {
         base.CreateButton(parent);
 
         Button!.usesRemainingSprite.sprite = TouAssets.AbilityCounterKillSprite.LoadAsset();
+
+        CurrentName = ProtectionText[0];
+        OverrideName(CurrentName);
     }
 
     protected override void OnClick()
@@ -226,9 +221,21 @@ public sealed class HerbalistAbilityHerbButton : TownOfUsRoleButton<HerbalistRol
     }
     public override void OverrideName(string name)
     {
-        CurrentName = name;
-        Button?.OverrideText(CurrentHerbsLimited ? (CurrentName + " - " + CurrentHerbsText) : CurrentName);
+        CurrentName = CurrentAbility switch
+        {
+            HerbAbilities.Kill or HerbAbilities.Expose or HerbAbilities.Confuse or HerbAbilities.Protect =>
+                ProtectionText[(int)CurrentAbility],
+            _ => string.Empty
+        };
+
+    if (Button != null)
+    {
+        Button.OverrideText(
+            CurrentHerbsLimited
+                ? $"{CurrentName} - {CurrentHerbsText}"
+                : CurrentName);
     }
+}
     private static Func<HerbalistExposedModifier, bool> ExposedPredicate { get; } =
         msModifier => msModifier.Herbalist.AmOwner;
     

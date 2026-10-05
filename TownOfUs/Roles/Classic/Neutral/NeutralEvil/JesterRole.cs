@@ -1,11 +1,15 @@
 ﻿using AmongUs.GameOptions;
 using Il2CppInterop.Runtime.Attributes;
 using MiraAPI.GameOptions;
+using MiraAPI.Hud;
 using MiraAPI.Modifiers;
 using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
+using MiraAPI.Utilities;
+using TownOfUs.Buttons;
 using TownOfUs.Interfaces;
 using TownOfUs.Modifiers;
+using TownOfUs.Modifiers.Game.Universal;
 using TownOfUs.Options.Roles.Neutral;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
@@ -13,16 +17,32 @@ using UnityEngine;
 namespace TownOfUs.Roles.Neutral;
 
 public sealed class JesterRole(IntPtr cppPtr)
-    : NeutralRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable, ICrewVariant, IGuessable
+    : NeutralRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable, ICrewVariant, IGuessable, IAnnounceableKill
 {
+    public void AnnounceKill(PlayerControl source, PlayerControl victim)
+    {
+        var text = !OptionGroupSingleton<JesterOptions>.Instance.JestAnnounceWin.Value
+            ? MiraLocaleManager.Get("TownOfUsMira.Role.AnonymousVictoryKillNotif").Replace("<source>", source.Data.PlayerName)
+            : MiraLocaleManager.Get("TownOfUsMira.Role.JesterHauntNotif");
+        var notif = Helpers.CreateAndShowNotification(
+            $"<b>{text.Replace("<victim>", victim.Data.PlayerName)}</b>",
+            Color.white, new Vector3(0f, 2f, -20f), spr: TouRoleIcons.Jester.LoadAsset());
+        notif.AdjustNotification();
+        notif.alphaTimer = 5f;
+    }
+    [HideFromIl2Cpp]
+    public bool CanModifierContinueGame(BaseModifier modifier)
+    {
+        return modifier is TiebreakerModifier;
+    }
     public override void SpawnTaskHeader(PlayerControl playerControl)
     {
-        if (playerControl != PlayerControl.LocalPlayer)
+        if (!playerControl.AmOwner)
         {
             return;
         }
         ImportantTextTask orCreateTask = PlayerTask.GetOrCreateTask<ImportantTextTask>(playerControl, 0);
-        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{TouLocale.GetParsed("NeutralEvilTaskHeader")}</color>";
+        orCreateTask.Text = $"{TownOfUsColors.Neutral.ToTextColor()}{MiraLocaleManager.Get("NeutralEvilTaskHeader")}</color>";
         orCreateTask.name = "NeutralRoleText";
     }
 
@@ -44,15 +64,13 @@ public sealed class JesterRole(IntPtr cppPtr)
             OptionGroupSingleton<ExecutionerOptions>.Instance.OnTargetDeath is BecomeOptions.Jester);
 
     public DoomableType DoomHintType => DoomableType.Trickster;
-    public string LocaleKey => "Jester";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Jester";
+    public string RoleMedDescriptionLocale => $"TownOfUsMira.Role.{IdPart}.TabDescription";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -62,7 +80,8 @@ public sealed class JesterRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
-        CanUseVent = OptionGroupSingleton<JesterOptions>.Instance.CanVent,
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Jester.LoadAsset(), "TouMira.Role.Neutral.Jester", 1.45f),
+        GetsVentData = OptionGroupSingleton<JesterOptions>.Instance.CanVent.Value,
         IntroSound = TouAudio.NoisemakerIntroSound,
         GhostRole = (RoleTypes)RoleId.Get<NeutralGhostRole>(),
         OptionsScreenshot = TouBanners.JesterRoleBanner,
@@ -72,8 +91,6 @@ public sealed class JesterRole(IntPtr cppPtr)
     public bool MetWinCon => Voted;
 
     public bool HasImpostorVision => OptionGroupSingleton<JesterOptions>.Instance.ImpostorVision;
-
-
 
     public bool WinConditionMet()
     {
@@ -101,13 +118,15 @@ public sealed class JesterRole(IntPtr cppPtr)
 
         if (Player.AmOwner)
         {
-            if (OptionGroupSingleton<JesterOptions>.Instance.ScatterOn)
+            if (OptionGroupSingleton<JesterOptions>.Instance.ScatterOn.Value)
             {
-                Player.AddModifier<ScatterModifier>(OptionGroupSingleton<JesterOptions>.Instance.ScatterTimer);
+                Player.AddModifier<ScatterModifier>(OptionGroupSingleton<JesterOptions>.Instance.ScatterTimer.Value);
             }
 
-            HudManager.Instance.ImpostorVentButton.graphic.sprite = TouNeutAssets.JesterVentSprite.LoadAsset();
-            HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Jester);
+            if (OptionGroupSingleton<JesterOptions>.Instance.CanVent.Value)
+            {
+                CustomButtonSingleton<FakeVentButton>.Instance.Show = false;
+            }
         }
     }
 
@@ -118,13 +137,12 @@ public sealed class JesterRole(IntPtr cppPtr)
 
         if (Player.AmOwner)
         {
-            if (OptionGroupSingleton<JesterOptions>.Instance.ScatterOn)
+            if (OptionGroupSingleton<JesterOptions>.Instance.ScatterOn.Value)
             {
                 Player.RemoveModifier<ScatterModifier>();
             }
 
-            HudManager.Instance.ImpostorVentButton.graphic.sprite = TouAssets.VentSprite.LoadAsset();
-            HudManager.Instance.ImpostorVentButton.buttonLabelText.SetOutlineColor(TownOfUsColors.Impostor);
+            CustomButtonSingleton<FakeVentButton>.Instance.Show = true;
         }
 
         if (!Player.HasModifier<BasicGhostModifier>() && Voted)

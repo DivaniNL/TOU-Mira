@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using MiraAPI.GameOptions;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Options.Modifiers;
 using TownOfUs.Options.Modifiers.Crewmate;
 using UnityEngine;
@@ -11,18 +10,22 @@ namespace TownOfUs.Modifiers.Game.Crewmate;
 
 public sealed class BaitModifier : TouGameModifier, IWikiDiscoverable
 {
-    public override string LocaleKey => "Bait";
-    public override string ModifierName => TouLocale.Get($"TouModifier{LocaleKey}");
-    public override string IntroInfo => TouLocale.GetParsed($"TouModifier{LocaleKey}IntroBlurb");
+    public override ModifierUiConfiguration Configuration => new(
+        TownOfUsColors.Bait,
+        TmpSpriteUtils.CreateSpriteAsset(TouModifierIcons.Bait.LoadAsset(),
+            "TouMira.Modifier.Crewmate.Bait", 1.45f));
+    public override string IdPart => "Bait";
+    public override string ModifierName => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}");
+    public override string IntroInfo => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.IntroBlurb");
 
     public override string GetDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}TabDescription");
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.TabDescription");
     }
 
     public string GetAdvancedDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}WikiDescription") + MiscUtils.AppendOptionsText(GetType());
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.WikiDescription") + MiscUtils.AppendOptionsText(GetType());
     }
 
     public override LoadableAsset<Sprite>? ModifierIcon => TouModifierIcons.Bait;
@@ -42,7 +45,7 @@ public sealed class BaitModifier : TouGameModifier, IWikiDiscoverable
 
     public override int GetAmountPerGame()
     {
-        return (int)OptionGroupSingleton<CrewmateModifierOptions>.Instance.BaitAmount;
+        return 1;
     }
 
     public override bool IsModifierValidOn(RoleBehaviour role)
@@ -59,7 +62,7 @@ public sealed class BaitModifier : TouGameModifier, IWikiDiscoverable
 
         yield return new WaitForSeconds(Random.RandomRange(MinDelay, MaxDelay));
 
-        if (MeetingHud.Instance != null)
+        if (MeetingHud.Instance)
         {
             yield break;
         }
@@ -68,10 +71,10 @@ public sealed class BaitModifier : TouGameModifier, IWikiDiscoverable
         {
             killer.CmdReportDeadBody(target.Data);
 
-            var text = TouLocale.GetParsed("TouModifierBaitTriggeredNotif").Replace("<player>", target.Data.PlayerName);
+            var text = MiraLocaleManager.Get("TownOfUsMira.Modifier.BaitTriggeredNotif").Replace("<player>", target.Data.PlayerName);
 
             var notif1 = Helpers.CreateAndShowNotification(
-                $"<b>{text.Replace("<modifier>", $"{TownOfUsColors.Bait.ToTextColor()}{TouLocale.Get("TouModifierBait")}</color>")}</b>",
+                $"<b>{text.Replace("<modifier>", $"{TownOfUsColors.Bait.ToTextColor()}{MiraLocaleManager.Get("TownOfUsMira.Modifier.Bait")}</color>")}</b>",
                 Color.white, new Vector3(0f, 1f, -20f), spr: TouModifierIcons.Bait.LoadAsset());
 
             notif1.AdjustNotification();

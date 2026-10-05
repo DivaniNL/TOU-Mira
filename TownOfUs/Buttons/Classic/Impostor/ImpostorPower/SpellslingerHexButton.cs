@@ -1,7 +1,6 @@
 using MiraAPI.GameOptions;
 using MiraAPI.Hud;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modifiers.Impostor;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Impostor;
@@ -11,7 +10,7 @@ namespace TownOfUs.Buttons.Impostor;
 
 public sealed class SpellslingerHexButton : TownOfUsRoleButton<SpellslingerRole, PlayerControl>
 {
-    public override string Name => TouLocale.GetParsed("TouRoleSpellslingerHex", "Hex");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.SpellslingerHex", "Hex");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Impostor;
     public override float Cooldown => Math.Clamp(OptionGroupSingleton<SpellslingerOptions>.Instance.HexCooldown + MapCooldown, 5f, 120f);

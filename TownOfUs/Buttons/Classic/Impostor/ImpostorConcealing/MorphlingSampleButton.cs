@@ -1,16 +1,15 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.Hud;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Impostor;
 using UnityEngine;
 
 namespace TownOfUs.Buttons.Impostor;
 
-public sealed class MorphlingSampleButton : TownOfUsRoleButton<MorphlingRole, PlayerControl>, IAftermathablePlayerButton
+public sealed class MorphlingSampleButton : TownOfUsRoleButton<MorphlingRole, PlayerControl>, IAftermathablePlayerButton, ILegacyCapable
 {
-    public override string Name => TouLocale.GetParsed("TouRoleMorphlingSample", "Sample");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.MorphlingSample", "Sample");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Impostor;
     public override float Cooldown => 0.001f;
@@ -18,7 +17,7 @@ public sealed class MorphlingSampleButton : TownOfUsRoleButton<MorphlingRole, Pl
     public override int MaxUses => (int)OptionGroupSingleton<MorphlingOptions>.Instance.MaxSamples;
 
     public override bool ZeroIsInfinite { get; set; } = true;
-    public override LoadableAsset<Sprite> Sprite => TouImpAssets.SampleSprite;
+    public override LoadableAsset<Sprite> Sprite => LegacyAssets.IsLegacy ? LegacyImpAssets.SampleSprite : TouImpAssets.SampleSprite;
 
     public void AftermathHandler()
     {
@@ -60,7 +59,7 @@ public sealed class MorphlingSampleButton : TownOfUsRoleButton<MorphlingRole, Pl
         Role.Sampled = Target;
 
         var notif1 = Helpers.CreateAndShowNotification(
-            TouLocale.GetParsed("TouRoleMorphlingSampleNotif").Replace("<player>", $"{TownOfUsColors.ImpSoft.ToTextColor()}{Target.Data.PlayerName}</color>"),
+            MiraLocaleManager.Get("TownOfUsMira.Role.MorphlingSampleNotif").Replace("<player>", $"{TownOfUsColors.ImpSoft.ToTextColor()}{Target.Data.PlayerName}</color>"),
             Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Morphling.LoadAsset());
         notif1.AdjustNotification();
 

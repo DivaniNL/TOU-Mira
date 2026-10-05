@@ -1,11 +1,9 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using Reactor.Networking.Attributes;
 using Reactor.Utilities.Extensions;
 using TownOfUs.Interfaces;
-using TownOfUs.Modifiers.Game;
 using TownOfUs.Modules;
 using TownOfUs.Options.Modifiers;
 using UnityEngine;
@@ -14,7 +12,11 @@ namespace TownOfUs.Modifiers.HnsGame.Crewmate;
 
 public sealed class HnsTransporterModifier : HnsGameModifier
 {
-    public override string LocaleKey => "Transporter";
+    public override ModifierUiConfiguration Configuration => new(
+        new Color32(0, 237, 255, 255),
+        TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Transporter.LoadAsset(),
+            "TouMira.Modifier.HnS.Hider.Transporter", 1.45f));
+    public override string IdPart => "Transporter";
     public override LoadableAsset<Sprite>? ModifierIcon => TouRoleIcons.Transporter;
     public override ModifierFaction FactionType => ModifierFaction.HiderPostmortem;
 
@@ -61,19 +63,19 @@ public sealed class HnsTransporterModifier : HnsGameModifier
         if (seeker.AmOwner || randomVictim.AmOwner)
         {
             var notif1 = Helpers.CreateAndShowNotification(
-                $"<b>{TownOfUsColors.Transporter.ToTextColor()}{TouLocale.GetParsed("TouRoleTransporterTransportNotif")}</color></b>", Color.white,
+                $"<b>{TownOfUsColors.Transporter.ToTextColor()}{MiraLocaleManager.Get("TownOfUsMira.Role.TransporterTransportNotif")}</color></b>", Color.white,
                 new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Transporter.LoadAsset());
 
             notif1.AdjustNotification();
 
-            if (Minigame.Instance != null)
+            if (Minigame.Instance)
             {
                 Minigame.Instance.Close();
                 Minigame.Instance.Close();
             }
         }
 
-        (Vector2, Vector2) GetAdjustedPositions(PlayerControl player1, PlayerControl player2)
+        static (Vector2, Vector2) GetAdjustedPositions(PlayerControl player1, PlayerControl player2)
         {
             // assign dummy values so it doesnt error about returning unassigned variables
             var tp1Position = player1.GetTruePosition();

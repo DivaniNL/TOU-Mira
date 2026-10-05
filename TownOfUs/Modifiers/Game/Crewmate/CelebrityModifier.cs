@@ -1,12 +1,11 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using Reactor.Networking.Attributes;
 using TownOfUs.Modules;
 using TownOfUs.Options.Modifiers;
+using TownOfUs.Roles;
 using TownOfUs.Roles.Crewmate;
-using TownOfUs.Roles.Neutral;
 using TownOfUs.Utilities.Appearances;
 using UnityEngine;
 
@@ -14,18 +13,22 @@ namespace TownOfUs.Modifiers.Game.Crewmate;
 
 public sealed class CelebrityModifier : TouGameModifier, IWikiDiscoverable
 {
-    public override string LocaleKey => "Celebrity";
-    public override string ModifierName => TouLocale.Get($"TouModifier{LocaleKey}");
-    public override string IntroInfo => TouLocale.GetParsed($"TouModifier{LocaleKey}IntroBlurb");
+    public override ModifierUiConfiguration Configuration => new(
+        TownOfUsColors.Celebrity,
+        TmpSpriteUtils.CreateSpriteAsset(TouModifierIcons.Celebrity.LoadAsset(),
+            "TouMira.Modifier.Crewmate.Celebrity", 1.45f));
+    public override string IdPart => "Celebrity";
+    public override string ModifierName => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}");
+    public override string IntroInfo => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.IntroBlurb");
 
     public override string GetDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}TabDescription");
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.TabDescription");
     }
 
     public string GetAdvancedDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}WikiDescription");
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.WikiDescription");
     }
 
     public override LoadableAsset<Sprite>? ModifierIcon => TouModifierIcons.Celebrity;
@@ -49,7 +52,7 @@ public sealed class CelebrityModifier : TouGameModifier, IWikiDiscoverable
 
     public override int GetAmountPerGame()
     {
-        return (int)OptionGroupSingleton<CrewmateModifierOptions>.Instance.CelebrityAmount != 0 ? 1 : 0;
+        return 1;
     }
 
     public override bool IsModifierValidOn(RoleBehaviour role)
@@ -70,7 +73,7 @@ public sealed class CelebrityModifier : TouGameModifier, IWikiDiscoverable
         var celeb = player.GetModifier<CelebrityModifier>()!;
         celeb.StoredRoom = room;
         celeb.DeathTime = DateTime.UtcNow;
-        var splitCelebrityString = TouLocale.GetParsed("TouModifierCelebrityPopup").Split(":");
+        var splitCelebrityString = MiraLocaleManager.Get("TownOfUsMira.Modifier.CelebrityPopup").Split(":");
 
         var announceText = splitCelebrityString[0];
         if (splitCelebrityString.Length > 1)
@@ -87,47 +90,32 @@ public sealed class CelebrityModifier : TouGameModifier, IWikiDiscoverable
             celeb.Announced = true;
         }
 
-        var celebHyperlink = $"&{TouLocale.Get("TouModifierCelebrity")}";
+        var celebHyperlink = $"&{MiraLocaleManager.Get("TownOfUsMira.Modifier.Celebrity")}";
 
         if (source == player)
         {
-            celeb.DeathMessage = TouLocale.GetParsed("TouModifierCelebrityDetailsSelf");
+            celeb.DeathMessage = MiraLocaleManager.Get("TownOfUsMira.Modifier.CelebrityDetailsSelf");
         }
         else
         {
-            var role = source.GetRoleWhenAlive();
+            var role = source.Data.Role is IGhostRole ? source.Data.Role : source.GetRoleWhenAlive();
             var cod = "Killer";
-            switch (role)
-            {
-                case MirrorcasterRole mirror:
-                    cod = mirror.UnleashString != string.Empty
-                        ? mirror.UnleashString
-                        : TouLocale.Get("DiedToKiller");
-                    mirror.UnleashString = string.Empty;
-                    mirror.ContainedRole = null;
-                    break;
-                default:
-                    var localeKey = role.GetRoleLocaleKey();
-                    if (localeKey == "KEY_MISS" ||
-                        TouLocale.Get($"DiedTo{localeKey}").Contains("STRMISS"))
-                    {
-                        break;
-                    }
 
-                    cod = localeKey;
-                    break;
+            var roleToCheck = role is MirrorcasterRole mirror ? mirror.ContainedRole ?? mirror : role;
+            var IdPart = roleToCheck.GetRoleIdPart();
+            if (IdPart != "KEY_MISS" &&
+                MiraLocaleManager.Get($"DiedTo{IdPart}") != $"DiedTo{IdPart}")
+            {
+                cod = IdPart;
             }
 
-            if (source.Data.Role is SpectreRole phantomTouRole)
+            if (source.Data.Role is IGhostRole && source.Data.Role is ITownOfUsRole touRole)
             {
-                role = source.Data.Role;
-                cod = phantomTouRole.LocaleKey;
+                cod = touRole.IdPart;
             }
 
-            var text = role is MirrorcasterRole
-                ? cod.ToLowerInvariant()
-                : TouLocale.Get($"DiedTo{cod}").ToLowerInvariant();
-            celeb.DeathMessage = TouLocale.GetParsed("TouModifierCelebrityDetailsKilled").Replace("<killed>", text);
+            var text = MiraLocaleManager.Get($"DiedTo{cod}").ToLowerInvariant();
+            celeb.DeathMessage = MiraLocaleManager.Get("TownOfUsMira.Modifier.CelebrityDetailsKilled").Replace("<killed>", text);
             celeb.DeathMessage =
                 celeb.DeathMessage.Replace("<role>", $"#{role.GetRoleName().ToLowerInvariant().Replace(" ", "-")}");
         }

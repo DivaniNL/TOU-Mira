@@ -4,6 +4,7 @@ using MiraAPI.Modifiers;
 using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
 using TownOfUs.Modifiers;
+using TownOfUs.Modules;
 using UnityEngine;
 
 namespace TownOfUs.Roles.Other;
@@ -15,6 +16,7 @@ public sealed class SpectatorRole(IntPtr cppPtr) : RoleBehaviour(cppPtr), ITownO
     public static readonly HashSet<string> TrackedSpectators = [];
     public static readonly List<PlayerControl> TrackedPlayers = [];
     public static bool FixedCam;
+    public bool IsDraftable => false;
     private static int CurrentTarget;
     private bool ShowHud;
     private bool ShowShadows;
@@ -50,27 +52,25 @@ public sealed class SpectatorRole(IntPtr cppPtr) : RoleBehaviour(cppPtr), ITownO
         HudManager.Instance.AbilityButton.SetDisabled();
     }
 
-    public string LocaleKey => "Spectator";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Spectator";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
     public Color RoleColor => TownOfUsColors.Spectator;
     public ModdedRoleTeams Team => ModdedRoleTeams.Custom;
     public RoleAlignment RoleAlignment => RoleAlignment.GameOutlier;
-    [HideFromIl2Cpp] public bool IsHiddenFromList => true;
+    [HideFromIl2Cpp] public bool IsHiddenFromList => false;
 
     public override bool IsDead => true;
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Spectator.LoadAsset(), "TouMira.Role.Game.Spectator", 1.45f),
         TasksCountForProgress = false,
         IntroSound = TouAudio.NoisemakerIntroSound,
         Icon = TouRoleIcons.Spectator,
@@ -87,7 +87,12 @@ public sealed class SpectatorRole(IntPtr cppPtr) : RoleBehaviour(cppPtr), ITownO
             Player.AddModifier<BasicGhostModifier>();
         }
 
-        DeathHandlerModifier.UpdateDeathHandlerImmediate(Player, "Spectating", 0, DeathHandlerOverride.SetFalse);
+        var stats = GameHistory.PlayerStats[Player.PlayerId];
+        stats.DeathString = MiraLocaleManager.Get("Spectating");
+        stats.RoundOfDeath = 0;
+        stats.DiedThisRound = false;
+        stats.PlayerState = StoredPlayerState.Dead;
+        stats.IsSpectator = true;
 
         if (!Player.AmOwner)
         {
@@ -130,7 +135,7 @@ public sealed class SpectatorRole(IntPtr cppPtr) : RoleBehaviour(cppPtr), ITownO
 
     public void Update()
     {
-        if (PlayerControl.LocalPlayer == null || PlayerControl.LocalPlayer.Data == null ||
+        if (!PlayerControl.LocalPlayer || !PlayerControl.LocalPlayer.Data ||
             PlayerControl.LocalPlayer.Data.Role is not SpectatorRole || LobbyBehaviour.Instance ||
             MeetingHud.Instance || ExileController.Instance ||
             !HudManager.Instance || HudManager.Instance.Chat.IsOpenOrOpening)

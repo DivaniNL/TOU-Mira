@@ -7,15 +7,13 @@ namespace TownOfUs.Roles.Impostor;
 public sealed class EclipsalRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable
 {
     public DoomableType DoomHintType => DoomableType.Perception;
-    public string LocaleKey => "Eclipsal";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Eclipsal";
+    public string RoleMedDescriptionLocale => $"TownOfUsMira.Role.{IdPart}.TabDescription";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -25,6 +23,7 @@ public sealed class EclipsalRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOfU
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Eclipsal.LoadAsset(), "TouMira.Role.Impostor.Eclipsal", 1.45f),
         OptionsScreenshot = TouBanners.ImpostorRoleBanner,
         Icon = TouRoleIcons.Eclipsal
     };
@@ -36,12 +35,12 @@ public sealed class EclipsalRole(IntPtr cppPtr) : ImpostorRole(cppPtr), ITownOfU
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Blind", "Blind"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}BlindWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Blind", "Blind"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Blind.WikiDescription"),
                     TouImpAssets.BlindSprite)
-            };
+            ];
         }
     }
 }

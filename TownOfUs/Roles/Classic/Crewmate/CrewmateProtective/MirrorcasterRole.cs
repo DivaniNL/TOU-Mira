@@ -11,44 +11,47 @@ using Reactor.Utilities;
 using TownOfUs.Buttons.Crewmate;
 using TownOfUs.Modifiers.Crewmate;
 using TownOfUs.Modules;
+using TownOfUs.Options;
 using TownOfUs.Options.Roles.Crewmate;
-using TownOfUs.Roles.Neutral;
 using UnityEngine;
 
 namespace TownOfUs.Roles.Crewmate;
 
 public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewRole, IWikiDiscoverable, IDoomable
 {
+    public void InitialSetup()
+    {
+        TmpSpriteUtils.CreateSpriteAsset(TouCrewAssets.MagicMirrorSprite.LoadAsset(),
+            "TouMira.Role.Crewmate.Mirrorcaster.Ui.MagicMirror", 1.45f);
+    }
     public override bool IsAffectedByComms => false;
 
     [HideFromIl2Cpp] public PlayerControl? Protected { get; set; }
+    public bool IsProtecting { get; set; }
     public int UnleashesAvailable { get; set; }
-    public string UnleashString { get; set; }
     [HideFromIl2Cpp] public RoleBehaviour? ContainedRole { get; set; }
 
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data.Role is not MirrorcasterRole)
+        if (!Player || Player.Data.Role is not MirrorcasterRole)
         {
             return;
         }
 
-        if (Protected != null && Protected.HasDied())
+        var dced = IsProtecting && Protected == null;
+        if (Protected != null && Protected.HasDied() || dced)
         {
-            Clear();
+            Clear(dced);
         }
     }
 
     public DoomableType DoomHintType => DoomableType.Protective;
-    public string LocaleKey => "Mirrorcaster";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Mirrorcaster";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -57,15 +60,15 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}MagicMirror", "Magic Mirror"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}MagicMirrorWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}MagicMirror", "Magic Mirror"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}MagicMirror.WikiDescription"),
                     TouCrewAssets.MagicMirrorSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Unleash", "Unleash"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}UnleashWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Unleash", "Unleash"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Unleash.WikiDescription"),
                     TouCrewAssets.UnleashSprite)
-            };
+            ];
         }
     }
 
@@ -75,7 +78,8 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
 
     public CustomRoleConfiguration Configuration => new(this)
     {
-        IntroSound = TouAudio.ScientistIntroSound,
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Mirrorcaster.LoadAsset(), "TouMira.Role.Crewmate.Mirrorcaster", 1.45f),
+        IntroSound = TouAudio.MirrorcasterIntro,
         OptionsScreenshot = TouBanners.CrewmateRoleBanner,
         Icon = TouRoleIcons.Mirrorcaster
     };
@@ -85,12 +89,12 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
         ModifierUtils.GetActiveModifiers<MagicMirrorModifier>()
             .HasAny(); // Always disable end game checks if there is an Unleash available
 
-    public static string ProtectionString = TouLocale.GetParsed("TouRoleMirrorcasterTabProtecting");
+    public static string ProtectionString = MiraLocaleManager.Get("TownOfUsMira.Role.MirrorcasterTabProtecting");
 
     public override void Initialize(PlayerControl player)
     {
         RoleBehaviourStubs.Initialize(this, player);
-        ProtectionString = TouLocale.GetParsed("TouRoleMirrorcasterTabProtecting");
+        ProtectionString = MiraLocaleManager.Get("TownOfUsMira.Role.MirrorcasterTabProtecting");
     }
 
     [HideFromIl2Cpp]
@@ -100,14 +104,25 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
 
         if (Protected != null)
         {
-            stringB.AppendLine(TownOfUsPlugin.Culture, $"\n<b>{ProtectionString.Replace("<player>", Protected.Data.PlayerName)}</b>");
+            stringB.AppendLine(TownOfUsPlugin.Culture, $"\n<b><sprite name=\"TouMira.Role.Crewmate.Mirrorcaster.Ui.MagicMirror\">{ProtectionString.Replace("<player>", Protected.Data.PlayerName)}</b>");
         }
 
         return stringB;
     }
 
-    public void Clear()
+    public void Clear(bool playerLeft = false)
     {
+        if (playerLeft)
+        {
+            IsProtecting = false;
+            Protected = null;
+            if (Player.AmOwner)
+            {
+                var button = CustomButtonSingleton<MirrorcasterMagicMirrorButton>.Instance;
+                button.TargetWasValid = false;
+                button.ResetCooldownAndOrEffect();
+            }
+        }
         SetProtectedPlayer(null);
     }
 
@@ -127,16 +142,12 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
 
     public void SetProtectedPlayer(PlayerControl? player)
     {
+        IsProtecting = false;
         if (Protected == player && player != null)
         {
             if (player.TryGetModifier<MagicMirrorModifier>(out var mod2))
             {
-                if (!mod2.TimerActive)
-                {
-                    return;
-                }
-
-                mod2.ResetTimer();
+                player.RemoveModifier(mod2);
             }
 
             return;
@@ -144,18 +155,25 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
 
         if (Protected?.TryGetModifier<MagicMirrorModifier>(out var mod) == true)
         {
-            // This should prevent any issues with murder attempts
-            mod.StartTimer();
+            Protected.RemoveModifier(mod);
         }
 
         Protected = (player?.HasDied() == true) ? null : player;
-
-        Protected?.AddModifier<MagicMirrorModifier>(Player);
+        if (Protected != null)
+        {
+            IsProtecting = true;
+            Protected.AddModifier<MagicMirrorModifier>(Player);
+        }
     }
 
-    public static void DangerAnim()
+    public static void DangerAnim(bool localMirrorcaster = false)
     {
-        Coroutines.Start(MiscUtils.CoFlash(new Color32(144, 162, 195, 255)));
+        Coroutines.Start(MiscUtils.CoFlash(OptionGroupSingleton<GameMechanicOptions>.Instance.AnonymousShields && !localMirrorcaster ? TownOfUsColors.NeutralWiki : new Color32(144, 162, 195, 255)));
+        if (localMirrorcaster)
+        {
+            TouAudio.PlaySound(TouAudio.MirrorcasterShatter);
+            HudManager.Instance.StartCoroutine(HudManager.Instance.PlayerCam.CoShakeScreen(0.4f, 3f));
+        }
     }
 
     [MethodRpc((uint)TownOfUsRpc.MagicMirror)]
@@ -232,49 +250,19 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
         role.SetProtectedPlayer(null);
         role.UnleashesAvailable++;
 
-        var cod = "Killed";
         var killerRole = source.GetRoleWhenAlive();
-        var checkForCod = true;
         if (killerRole is MirrorcasterRole mirrorcaster2)
         {
             role.ContainedRole = mirrorcaster2.ContainedRole;
-            cod = mirrorcaster2.UnleashString;
-            checkForCod = cod == string.Empty || mirrorcaster2.ContainedRole == null;
             mirrorcaster2.ContainedRole = null;
-            mirrorcaster2.UnleashString = string.Empty;
         }
 
-        if (checkForCod)
+        if (source.Data.Role is IGhostRole)
         {
-            switch (killerRole)
-            {
-                case SheriffRole:
-                    cod = "Shot";
-                    break;
-                case DeputyRole:
-                    cod = "Blasted";
-                    break;
-                case GlitchRole:
-                    cod = "Bugged";
-                    break;
-                case JuggernautRole:
-                    cod = "Destroyed";
-                    break;
-                case SoulCollectorRole:
-                    cod = "Reaped";
-                    break;
-                case VampireRole:
-                    cod = "Bitten";
-                    break;
-                case WerewolfRole:
-                    cod = "Rampaged";
-                    break;
-            }
-
-            role.ContainedRole = killerRole;
+            killerRole = source.Data.Role;
         }
 
-        role.UnleashString = cod;
+        role.ContainedRole = killerRole;
 
         var opt = OptionGroupSingleton<MirrorcasterOptions>.Instance;
         var attackInfo = (MirrorAttackInfo)opt.AttackInformationGiven.Value;
@@ -282,37 +270,37 @@ public sealed class MirrorcasterRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITou
         {
             CustomButtonSingleton<MirrorcasterMagicMirrorButton>.Instance.ResetCooldownAndOrEffect();
             CustomButtonSingleton<MirrorcasterUnleashButton>.Instance.ResetCooldownAndOrEffect();
-            DangerAnim();
-            var text = TouLocale.GetParsed("TouRoleMirrorcasterAttackedMessageWithoutType")
+            DangerAnim(true);
+            var text = MiraLocaleManager.Get("TownOfUsMira.Role.MirrorcasterAttackedMessageWithoutType")
                 .Replace("<player>", protectedPlayer.Data.PlayerName);
             switch (attackInfo)
             {
                 case MirrorAttackInfo.Role:
                     if (role.ContainedRole != null)
                     {
-                        text = TouLocale.GetParsed("TouRoleMirrorcasterAttackedMessageWithType")
+                        text = MiraLocaleManager.Get("TownOfUsMira.Role.MirrorcasterAttackedMessageWithType")
                             .Replace("<player>", protectedPlayer.Data.PlayerName)
                             .Replace("<attackerRole>", role.ContainedRole.GetRoleName());
                     }
                     break;
                 case MirrorAttackInfo.Faction:
-                    var faction = TouLocale.Get("CrewmateKeyword");
+                    var faction = MiraLocaleManager.Get("MiraApi.RoleTeam.Crewmate");
                     if (source.IsNeutral())
                     {
-                        faction = TouLocale.Get("NeutralKeyword");
+                        faction = MiraLocaleManager.Get("MiraApi.RoleTeam.Neutral");
                     }
                     else if (source.IsImpostor())
                     {
-                        faction = TouLocale.Get("ImpKeyword");
+                        faction = MiraLocaleManager.Get("MiraApi.RoleTeam.Impostor.Short");
                     }
-                    text = TouLocale.GetParsed("TouRoleMirrorcasterAttackedMessageWithFaction")
+                    text = MiraLocaleManager.Get("TownOfUsMira.Role.MirrorcasterAttackedMessageWithFaction")
                         .Replace("<player>", protectedPlayer.Data.PlayerName)
                         .Replace("<faction>", MiscUtils.GetColoredFactionString(faction));
                     break;
                 case MirrorAttackInfo.Subalignment:
                     if (role.ContainedRole != null)
                     {
-                        text = TouLocale.GetParsed("TouRoleMirrorcasterAttackedMessageWithSubalignment")
+                        text = MiraLocaleManager.Get("TownOfUsMira.Role.MirrorcasterAttackedMessageWithSubalignment")
                             .Replace("<player>", protectedPlayer.Data.PlayerName)
                             .Replace("<subalignment>", MiscUtils.GetParsedRoleAlignment(role.ContainedRole, true));
                     }

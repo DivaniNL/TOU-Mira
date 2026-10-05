@@ -1,8 +1,6 @@
 ﻿using MiraAPI.GameOptions;
-using MiraAPI.Utilities.Assets;
 using PowerTools;
 using Reactor.Utilities.Extensions;
-using TownOfUs.Modules;
 using TownOfUs.Modules.Anims;
 using TownOfUs.Options;
 using TownOfUs.Options.Roles.Impostor;
@@ -14,7 +12,7 @@ public sealed class HerbalistProtectionModifier(PlayerControl herbalist) : BaseS
 {
     public override string ModifierName => "Barrier";
     public override LoadableAsset<Sprite>? ModifierIcon => TouRoleIcons.Cleric;
-    public override string ShieldDescription => "You are shielded by a Cleric!\nNo one can interact with you.";
+ public override string ShieldDescription => MiraLocaleManager.Get("TownOfUsMira.Modifier.HerbalistProtectionDescription");
     public override float Duration => OptionGroupSingleton<HerbalistOptions>.Instance.ProtectDuration;
     public override bool AutoStart => true;
     public bool ShowBarrier { get; set; }
@@ -23,7 +21,7 @@ public sealed class HerbalistProtectionModifier(PlayerControl herbalist) : BaseS
     {
         get
         {
-            return !LocalSettingsTabSingleton<TownOfUsLocalRoleSettings>.Instance.ShowShieldHudToggle.Value ||
+            return !LocalSettingsTabSingleton<TouLocalTabButtons>.Instance.ShowShieldHudToggle.Value ||
                    !OptionGroupSingleton<HerbalistOptions>.Instance.ShowBarrier;
         }
     }
@@ -38,7 +36,7 @@ public sealed class HerbalistProtectionModifier(PlayerControl herbalist) : BaseS
     }
 
     public PlayerControl Herbalist { get; } = herbalist;
-    public GameObject? ClericBarrier { get; set; }
+    public GameObject ClericBarrier { get; set; }
 
 
     public override void OnActivate()
@@ -49,8 +47,7 @@ public sealed class HerbalistProtectionModifier(PlayerControl herbalist) : BaseS
 
         var body = UnityEngine.Object.FindObjectsOfType<DeadBody>().FirstOrDefault(x =>
             x.ParentId == PlayerControl.LocalPlayer.PlayerId && !TutorialManager.InstanceExists);
-        var fakePlayer = FakePlayer.FakePlayers.FirstOrDefault(x =>
-            x.PlayerId == PlayerControl.LocalPlayer.PlayerId && !TutorialManager.InstanceExists);
+            var fakePlayer = !TutorialManager.InstanceExists ? MiscUtils.GetFakePlayer(PlayerControl.LocalPlayer.PlayerId) : null;
 
         ShowBarrier = showBarrierSelf || Herbalist.AmOwner ||
                       (PlayerControl.LocalPlayer.HasDied() && genOpt.TheDeadKnow && !body && !fakePlayer?.body);
@@ -62,15 +59,15 @@ public sealed class HerbalistProtectionModifier(PlayerControl herbalist) : BaseS
 
     public override void Update()
     {
-        if (Player == null || Herbalist == null)
+        if (!Player || Herbalist == null)
         {
             ModifierComponent?.RemoveModifier(this);
             return;
         }
 
-        if (!MeetingHud.Instance && ClericBarrier?.gameObject != null)
+        if (!MeetingHud.Instance && ClericBarrier)
         {
-            ClericBarrier?.SetActive(!Player.IsConcealed() && IsVisible && ShowBarrier);
+            ClericBarrier.SetActive(!Player.IsConcealed() && IsVisible && ShowBarrier);
         }
     }
 
@@ -86,9 +83,9 @@ public sealed class HerbalistProtectionModifier(PlayerControl herbalist) : BaseS
 
     public override void OnDeactivate()
     {
-        if (ClericBarrier?.gameObject != null)
+        if (ClericBarrier)
         {
-            ClericBarrier.gameObject.Destroy();
+            ClericBarrier.Destroy();
         }
     }
 }

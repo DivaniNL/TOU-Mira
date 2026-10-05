@@ -1,13 +1,14 @@
 ﻿using MiraAPI.GameOptions;
 using MiraAPI.GameOptions.Attributes;
+using MiraAPI.GameOptions.OptionTypes;
 using MiraAPI.Utilities;
 using TownOfUs.Roles.Neutral;
 
 namespace TownOfUs.Options.Roles.Neutral;
 
-public sealed class GlitchOptions : AbstractOptionGroup<GlitchRole>
+public sealed class GlitchOptions : AbstractRoleOptionGroup<GlitchRole>
 {
-    public override string GroupName => TouLocale.Get("TouRoleGlitch", "Glitch");
+    public override string GroupName => MiraLocaleManager.Get("TownOfUsMira.Role.Glitch", "Glitch");
 
     [ModdedNumberOption("TouOptionGlitchKillCooldown", 5f, 120f, 2.5f, MiraNumberSuffixes.Seconds)]
     public float KillCooldown { get; set; } = 25f;
@@ -26,7 +27,13 @@ public sealed class GlitchOptions : AbstractOptionGroup<GlitchRole>
 
     [ModdedNumberOption("TouOptionGlitchHackDuration", 5f, 15f, 2.5f, MiraNumberSuffixes.Seconds)]
     public float HackDuration { get; set; } = 10f;
+    public ModdedEnumOption CanVent { get; set; } = new("TouOptionGlitchCanVent", (int)GlitchVent.Always, typeof(GlitchVent),
+        ["Never", "Unless Mimicking", "Always"]);
+}
 
-    [ModdedToggleOption("TouOptionGlitchCan Vent")]
-    public bool CanVent { get; set; } = true;
+public enum GlitchVent
+{
+    Never,
+    Unmimic,
+    Always,
 }

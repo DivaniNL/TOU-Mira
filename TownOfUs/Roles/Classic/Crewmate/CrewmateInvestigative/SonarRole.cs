@@ -12,15 +12,12 @@ public sealed class SonarRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
 {
     public override bool IsAffectedByComms => false;
     public DoomableType DoomHintType => DoomableType.Hunter;
-    public string LocaleKey => "Sonar";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Sonar";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -29,12 +26,12 @@ public sealed class SonarRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Track", "Track"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}TrackWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Track", "Track"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Track.WikiDescription"),
                     TouCrewAssets.TrackSprite)
-            };
+            ];
         }
     }
 
@@ -44,6 +41,7 @@ public sealed class SonarRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Sonar.LoadAsset(), "TouMira.Role.Crewmate.Sonar", 1.45f),
         Icon = TouRoleIcons.Sonar,
         OptionsScreenshot = TouBanners.SonarRoleBanner,
         IntroSound = TouAudio.TrackerIntroSound
@@ -55,7 +53,12 @@ public sealed class SonarRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
         var stringB = ITownOfUsRole.SetNewTabText(this);
 
         var players =
-            ModifierUtils.GetPlayersWithModifier<TrackerArrowTargetModifier>([HideFromIl2Cpp](x) => x.Owner == Player);
+            LocalSettingsTabSingleton<TouLocalTabGameplay>.Instance.SonarTargetType.Value is SonarTargetStyle
+                .Arrows
+                ? ModifierUtils.GetPlayersWithModifier<SonarArrowTargetModifier>([HideFromIl2Cpp](x) =>
+                    x.Owner == Player)
+                : ModifierUtils.GetPlayersWithModifier<SonarHeartbeatTargetModifier>([HideFromIl2Cpp](x) =>
+                    x.Owner == Player);
 
         var playerControls = players as PlayerControl[] ?? players.ToArray();
         if (playerControls.Length == 0)
@@ -63,7 +66,7 @@ public sealed class SonarRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
             return stringB;
         }
 
-        stringB.Append("\n<b>Tracked Players:</b>");
+        stringB.Append(TownOfUsPlugin.Culture, $"\n<b>{MiraLocaleManager.Get("TownOfUsMira.Role.TrackerTrackedPlayers")}</b>");
         foreach (var plr in playerControls)
         {
             stringB.Append(TownOfUsPlugin.Culture, $"\n{plr.Data.PlayerName}");
@@ -82,11 +85,19 @@ public sealed class SonarRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfUsRo
     public void Clear()
     {
         var players =
-            ModifierUtils.GetPlayersWithModifier<TrackerArrowTargetModifier>([HideFromIl2Cpp](x) => x.Owner == Player);
+            ModifierUtils.GetPlayersWithModifier<SonarArrowTargetModifier>([HideFromIl2Cpp](x) => x.Owner == Player);
 
         foreach (var player in players)
         {
-            player.RemoveModifier<TrackerArrowTargetModifier>();
+            player.RemoveModifier<SonarArrowTargetModifier>();
+        }
+
+        players =
+            ModifierUtils.GetPlayersWithModifier<SonarHeartbeatTargetModifier>([HideFromIl2Cpp](x) => x.Owner == Player);
+
+        foreach (var player in players)
+        {
+            player.RemoveModifier<SonarHeartbeatTargetModifier>();
         }
     }
 }

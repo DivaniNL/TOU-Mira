@@ -13,11 +13,10 @@ namespace TownOfUs.Modifiers.Crewmate;
 
 public sealed class JailedModifier(byte jailorId) : BaseModifier
 {
-    private GameObject? jailCell;
-    public override string ModifierName => "Jailed";
+    private GameObject jailCell;
+    public override string ModifierName => MiraLocaleManager.Get("TownOfUsMira.Modifier.Jailed");
     public override bool HideOnUi => true;
     public byte JailorId { get; } = jailorId;
-    public bool HasOpenedQuickChat { get; set; }
 
     public bool IsJailorValid => !GameData.Instance.GetPlayerById(JailorId).Object.HasDied() &&
                                  GameData.Instance.GetPlayerById(JailorId).Object.Data.Role is JailorRole;
@@ -33,9 +32,10 @@ public sealed class JailedModifier(byte jailorId) : BaseModifier
     public override void OnMeetingStart()
     {
         Clear();
+        var meeting = MeetingHud.Instance;
         if (GameData.Instance.GetPlayerById(JailorId).Object.HasDied() ||
             GameData.Instance.GetPlayerById(JailorId).Object.Data.Role is not JailorRole || Player.HasDied() ||
-            !MeetingHud.Instance)
+            meeting == null)
         {
             ModifierComponent!.RemoveModifier(this);
             return;
@@ -48,13 +48,14 @@ public sealed class JailedModifier(byte jailorId) : BaseModifier
 
         if (Player.AmOwner)
         {
-            var title = $"<color=#{TownOfUsColors.Jailor.ToHtmlStringRGBA()}>Jailee Feedback</color>";
-            var text =
-                "You are jailed, convince the Jailor that you are Crew to avoid being executed in the chatbox above the user report button.";
+            var title =
+                $"<color=#{TownOfUsColors.Jailor.ToHtmlStringRGBA()}>{MiraLocaleManager.Get("TownOfUsMira.Modifier.JailedFeedbackTitle")}</color>";
+
+            var text = MiraLocaleManager.Get("TownOfUsMira.Modifier.JailedNonCrewFeedback");
+
             if (PlayerControl.LocalPlayer.Is(ModdedRoleTeams.Crewmate))
             {
-                text =
-                    "You are jailed, provide relevant information to the Jailor to prove you are Crew in the chatbox above the user report button.";
+                text = MiraLocaleManager.Get("TownOfUsMira.Modifier.JailedCrewFeedback");
             }
 
             MiscUtils.AddFakeChat(PlayerControl.LocalPlayer.Data, title, text, false, true);
@@ -65,10 +66,10 @@ public sealed class JailedModifier(byte jailorId) : BaseModifier
 
             notif1.AdjustNotification();
         }
-
-        foreach (var voteArea in MeetingHud.Instance.playerStates)
+        
+        foreach (var voteArea in meeting.playerStates)
         {
-            if (Player.PlayerId == voteArea.TargetPlayerId)
+            if (Player.PlayerId == voteArea.PlayerId)
             {
                 GenCell(voteArea);
             }
@@ -77,7 +78,10 @@ public sealed class JailedModifier(byte jailorId) : BaseModifier
 
     public void Clear()
     {
-        jailCell?.Destroy();
+        if (jailCell)
+        {
+            jailCell.Destroy();
+        }
     }
 
     private void GenCell(PlayerVoteArea voteArea)
@@ -94,7 +98,7 @@ public sealed class JailedModifier(byte jailorId) : BaseModifier
         jailCellObj.transform.localScale = new Vector3(0.6f, 0.6f, 0.6f);
         jailCellObj.layer = 5;
         jailCellObj.transform.parent = parent;
-        jailCellObj.transform.GetChild(0).gameObject.Destroy();
+        jailCellObj.transform.GetChild(0).gameObject.DeepDestroy();
 
         var passive = jailCellObj.GetComponent<PassiveButton>();
         passive.OnClick = new Button.ButtonClickedEvent();

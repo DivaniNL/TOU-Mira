@@ -13,7 +13,6 @@ using MiraAPI.Modifiers.ModifierDisplay;
 using MiraAPI.Modifiers.Types;
 using MiraAPI.Roles;
 using MiraAPI.Utilities;
-using PowerTools;
 using Reactor.Networking.Rpc;
 using Reactor.Utilities;
 using Reactor.Utilities.Extensions;
@@ -25,30 +24,32 @@ using TownOfUs.Buttons.Crewmate;
 using TownOfUs.Buttons.Impostor;
 using TownOfUs.Buttons.Neutral;
 using TownOfUs.Events.TouEvents;
+using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Game;
 using TownOfUs.Modifiers.Game.Universal;
 using TownOfUs.Modifiers.HnsGame.Crewmate;
 using TownOfUs.Modifiers.Impostor;
+using TownOfUs.Modifiers.Impostor.Venerer;
 using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Modules;
 using TownOfUs.Modules.Anims;
 using TownOfUs.Modules.Components;
 using TownOfUs.Modules.ControlSystem;
-using TownOfUs.Modules.RainbowMod;
+using TownOfUs.Modules.DraftMode;
 using TownOfUs.Networking;
 using TownOfUs.Options;
 using TownOfUs.Options.Roles.Crewmate;
-using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Patches;
 using TownOfUs.Patches.Misc;
 using TownOfUs.Patches.Options;
 using TownOfUs.Roles;
 using TownOfUs.Roles.Crewmate;
 using TownOfUs.Roles.Impostor;
+using TownOfUs.Roles.Neutral;
 using TownOfUs.Roles.Other;
+using TownOfUs.Utilities.Appearances;
 using UnityEngine;
 using Object = UnityEngine.Object;
-using Random = UnityEngine.Random;
 
 namespace TownOfUs.Events;
 
@@ -63,7 +64,7 @@ public static class TownOfUsEventHandlers
         Message
     }
 
-    internal static List<KeyValuePair<LogLevel, string>> LogBuffer = new();
+    internal static List<KeyValuePair<LogLevel, string>> LogBuffer = [];
 
     internal static TextMeshPro ModifierText;
     public static TaskPanelBehaviour RolePanel;
@@ -92,6 +93,11 @@ public static class TownOfUsEventHandlers
             newObj.layer = LayerMask.NameToLayer("UI");
             newObj.transform.localPosition = new Vector3(-1.2f, 0.325f, -0.1f);
             RoleIconRenderer = newObj.AddComponent<SpriteRenderer>();
+            RoleIconRenderer.sprite = PlayerControl.LocalPlayer.Data.Role.GetRoleIcon();
+            newObj.transform.localScale = new Vector3(1, 1, 1);
+            RoleIconRenderer.SetSizeLimit(0.4f);
+            var oldScale = newObj.transform.localScale;
+            newObj.transform.localScale = new(3.3333333333f * oldScale.x, 0.7843137255f * oldScale.y, 1);
         }
 
         if (RoleIconRenderer != null)
@@ -101,7 +107,6 @@ public static class TownOfUsEventHandlers
             RoleIconRenderer.SetSizeLimit(0.4f);
             var oldScale = RoleIconRenderer.transform.localScale;
             RoleIconRenderer.transform.localScale = new(3.3333333333f * oldScale.x, 0.7843137255f * oldScale.y, 1);
-            RoleIconRenderer.gameObject.SetActive(LocalSettingsTabSingleton<TownOfUsLocalRoleSettings>.Instance.ShowRoleIconOnRoleTab.Value);
         }
 
         return RolePanel;
@@ -122,7 +127,7 @@ public static class TownOfUsEventHandlers
         else if (uniModifier != null && option is ModReveal.Universal)
         {
             ModifierText.text =
-                $"<size=4><color=#FFFFFF>{TouLocale.Get("Modifier")}: </color>{uniModifier.ModifierName}</size>";
+                $"<size={uniModifier.IntroSize}><color=#FFFFFF>{MiraLocaleManager.Get("Modifier")}: </color>{uniModifier.ModifierName}</size>";
 
             ModifierText.color = MiscUtils.GetModifierColour(uniModifier);
         }
@@ -142,20 +147,26 @@ public static class TownOfUsEventHandlers
             Coroutines.Start(ModCompatibility.WaitMeeting(ModCompatibility.ResetTimers));
         }
 
-        if (PlayerControl.LocalPlayer.Data.Role is ITownOfUsRole custom)
+        var role = PlayerControl.LocalPlayer.Data.Role;
+        if (role is ITownOfUsRole tou)
         {
-            instance.RoleText.text = custom.RoleName;
+            instance.RoleText.text = tou.RoleName;
             if (instance.YouAreText.transform.TryGetComponent<TextTranslatorTMP>(out var tmp))
             {
-                tmp.defaultStr = custom.YouAreText;
+                tmp.defaultStr = tou.YouAreText;
                 tmp.TargetText = StringNames.None;
                 tmp.ResetText();
             }
 
-            instance.RoleBlurbText.text = custom.RoleDescription;
+            instance.RoleBlurbText.text = tou.RoleDescription;
         }
 
-        var teamModifier = PlayerControl.LocalPlayer.GetModifiers<TouGameModifier>().FirstOrDefault();
+        if (LocalSettingsTabSingleton<TouLocalTabPreferences>.Instance.RoleIconOnReveal.Value)
+        {
+            instance.RoleText.text = $"<size=80%>{MiscUtils.GetRoleTmpIcon(role)}</size>{instance.RoleText.text}";
+        }
+
+        var teamModifier = PlayerControl.LocalPlayer.GetModifiers<TouGameModifier>().FirstOrDefault(x => x.AppearsInIntro);
         if (teamModifier != null && OptionGroupSingleton<InitialRoundOptions>.Instance.TeamModifierReveal)
         {
             var color = MiscUtils.GetModifierColour(teamModifier);
@@ -168,6 +179,8 @@ public static class TownOfUsEventHandlers
     [RegisterEvent]
     public static void IntroBeginEventHandler(IntroBeginEvent @event)
     {
+        DraftSidebarManager.Deactivate();
+        DraftSidebarManager.ClearBannerRef();
         if (MiscUtils.CurrentGamemode() is TouGamemode.HideAndSeek)
         {
             return;
@@ -190,7 +203,7 @@ public static class TownOfUsEventHandlers
             cutscene.RoleBlurbText.text = custom.RoleDescription;
         }
 
-        var teamModifier = PlayerControl.LocalPlayer.GetModifiers<TouGameModifier>().FirstOrDefault();
+        var teamModifier = PlayerControl.LocalPlayer.GetModifiers<TouGameModifier>().FirstOrDefault(x => x.AppearsInIntro);
         if (teamModifier != null && OptionGroupSingleton<InitialRoundOptions>.Instance.TeamModifierReveal)
         {
             var color = MiscUtils.GetModifierColour(teamModifier);
@@ -208,7 +221,7 @@ public static class TownOfUsEventHandlers
     }
 
     [RegisterEvent]
-    public static void IntroEndEventHandler(IntroEndEvent @event)
+    public static void IntroEndEventHandler(IntroEndEvent _)
     {
         if (HudManager.InstanceExists)
         {
@@ -249,9 +262,10 @@ public static class TownOfUsEventHandlers
                 }
             }
 
-            if (PlayerControl.LocalPlayer.IsImpostor())
+            if (HudManager.Instance.KillButton)
             {
                 PlayerControl.LocalPlayer.SetKillTimer(genOpt.GameStartCd);
+                HudManager.Instance.KillButton.SetCoolDown(genOpt.GameStartCd, PlayerControl.LocalPlayer.killTimer);
             }
         }
 
@@ -263,8 +277,7 @@ public static class TownOfUsEventHandlers
         }
 
         var panel = TryGetRoleTab();
-        var role = PlayerControl.LocalPlayer.Data.Role as ICustomRole;
-        if (role == null || panel == null)
+        if (PlayerControl.LocalPlayer.Data.Role is not ICustomRole role || panel == null)
         {
             return;
         }
@@ -287,8 +300,21 @@ public static class TownOfUsEventHandlers
         panel.SetTaskText(role.SetTabText().ToString());
     }
 
+    [RegisterEvent(-10000)]
+    public static void BeforeMurderEventHandler(BeforeMurderEvent murderEvent)
+    {
+        if (murderEvent.Source.TryGetModifier<IndirectAttackerModifier>(out var mod))
+        {
+            if (mod.IgnoreShield)
+            {
+                murderEvent.IgnoreDefense = true;
+            }
+            murderEvent.IsIndirectAttack = true;
+        }
+    }
+
     [RegisterEvent]
-    public static void StartMeetingEventHandler(StartMeetingEvent @event)
+    public static void StartMeetingEventHandler(StartMeetingEvent _)
     {
         // Reset team chat state when a new meeting starts
         Patches.Options.TeamChatPatches.TeamChatActive = false;
@@ -317,7 +343,7 @@ public static class TownOfUsEventHandlers
         var killer = @event.Source;
         var victim = @event.Target;
         var text =
-            $"{killer.Data.PlayerName} ({killer.Data.Role.GetRoleName()}) is attempting to kill {victim.Data.PlayerName} ({victim.Data.Role.GetRoleName()}) | Meeting: {MeetingHud.Instance != null}";
+            $"{killer.Data.PlayerName} ({killer.Data.Role.GetRoleName()}) is attempting to kill {victim.Data.PlayerName} ({victim.Data.Role.GetRoleName()}) | Meeting: {MeetingHud.Instance}";
 
 
         MiscUtils.LogInfo(LogLevel.Error, text);
@@ -329,7 +355,7 @@ public static class TownOfUsEventHandlers
         var killer = @event.Source;
         var victim = @event.Target;
         var text =
-            $"{killer.Data.PlayerName} ({killer.Data.Role.GetRoleName()}) successfully killed {victim.Data.PlayerName} ({victim.GetRoleWhenAlive().GetRoleName()}) | Meeting: {MeetingHud.Instance != null}";
+            $"{killer.Data.PlayerName} ({killer.Data.Role.GetRoleName()}) successfully killed {victim.Data.PlayerName} ({victim.GetRoleWhenAlive().GetRoleName()}) | Meeting: {MeetingHud.Instance}";
 
         MiscUtils.LogInfo(LogLevel.Error, text);
     }
@@ -339,6 +365,33 @@ public static class TownOfUsEventHandlers
     {
         if (!@event.TriggeredByIntro)
         {
+            foreach (var button in CustomButtonManager.Buttons)
+            {
+                if (button is FakeVentButton)
+                {
+                    continue;
+                }
+
+                if (button is TownOfUsButton touButton && !touButton.UsableFirstRound)
+                {
+                    touButton.SetRoundLockActive(false);
+                }
+
+                if (button is TownOfUsTargetButton<Vent> touButton2 && !touButton2.UsableFirstRound)
+                {
+                    touButton2.SetRoundLockActive(false);
+                }
+
+                if (button is TownOfUsTargetButton<DeadBody> touButton3 && !touButton3.UsableFirstRound)
+                {
+                    touButton3.SetRoundLockActive(false);
+                }
+
+                if (button is TownOfUsTargetButton<PlayerControl> touButton4 && !touButton4.UsableFirstRound)
+                {
+                    touButton4.SetRoundLockActive(false);
+                }
+            }
             return; // Only run when game starts.
         }
 
@@ -379,22 +432,54 @@ public static class TownOfUsEventHandlers
             HudManager.Instance.SetHudActive(true);
         }
 
-        CustomButtonSingleton<WatchButton>.Instance.ExtraUses = 0;
-        CustomButtonSingleton<WatchButton>.Instance.SetUses((int)OptionGroupSingleton<LookoutOptions>.Instance
-            .MaxWatches);
-        CustomButtonSingleton<SonarTrackButton>.Instance.ExtraUses = 0;
-        CustomButtonSingleton<SonarTrackButton>.Instance.SetUses((int)OptionGroupSingleton<SonarOptions>.Instance
-            .MaxTracks);
-        CustomButtonSingleton<TrapperTrapButton>.Instance.ExtraUses = 0;
-        CustomButtonSingleton<TrapperTrapButton>.Instance.SetUses((int)OptionGroupSingleton<TrapperOptions>.Instance
-            .MaxTraps);
-        CustomButtonSingleton<VeteranAlertButton>.Instance.ExtraUses = 0;
-        CustomButtonSingleton<VeteranAlertButton>.Instance.SetUses((int)OptionGroupSingleton<VeteranOptions>.Instance
-            .MaxNumAlerts);
+        // This sets the sabo cooldowns properly
+        if (ShipStatus.Instance.Systems.TryGetValue(SkeldDoorsSystemType.SystemType, out var systemType))
+        {
+            systemType.Cast<IDoorSystem>().SetInitialSabotageCooldown();
+        }
+        else if (ShipStatus.Instance.Systems.TryGetValue(ManualDoorsSystemType.SystemType, out var systemType2))
+        {
+            systemType2.Cast<IDoorSystem>().SetInitialSabotageCooldown();
+        }
 
-        CustomButtonSingleton<SpellslingerHexButton>.Instance.SetUses((int)OptionGroupSingleton<SpellslingerOptions>
-            .Instance
-            .MaxHexes);
+        foreach (var button in CustomButtonManager.Buttons)
+        {
+            if (button is FakeVentButton)
+            {
+                continue;
+            }
+            button.SetUses(button.MaxUses);
+            button.Button?.usesRemainingText.gameObject.SetActive(button.LimitedUses);
+            button.Button?.usesRemainingSprite.gameObject.SetActive(button.LimitedUses);
+
+            if (!TutorialManager.InstanceExists)
+            {
+                if (button is TownOfUsButton touButton && !touButton.UsableFirstRound)
+                {
+                    touButton.SetRoundLockActive(true);
+                }
+
+                if (button is TownOfUsTargetButton<Vent> touButton2 && !touButton2.UsableFirstRound)
+                {
+                    touButton2.SetRoundLockActive(true);
+                }
+
+                if (button is TownOfUsTargetButton<DeadBody> touButton3 && !touButton3.UsableFirstRound)
+                {
+                    touButton3.SetRoundLockActive(true);
+                }
+
+                if (button is TownOfUsTargetButton<PlayerControl> touButton4 && !touButton4.UsableFirstRound)
+                {
+                    touButton4.SetRoundLockActive(true);
+                }
+            }
+        }
+
+        CustomButtonSingleton<WatchButton>.Instance.ExtraUses = 0;
+        CustomButtonSingleton<SonarTrackButton>.Instance.ExtraUses = 0;
+        CustomButtonSingleton<TrapperTrapButton>.Instance.ExtraUses = 0;
+        CustomButtonSingleton<VeteranAlertButton>.Instance.ExtraUses = 0;
 
         CustomButtonSingleton<JailorJailButton>.Instance.ExecutedACrew = false;
 
@@ -402,9 +487,6 @@ public static class TownOfUsEventHandlers
         CustomButtonSingleton<AltruistSacrificeButton>.Instance.RevivedInRound = false;
 
         var medicShield = CustomButtonSingleton<MedicShieldButton>.Instance;
-        medicShield.SetUses(OptionGroupSingleton<MedicOptions>.Instance.ChangeTarget
-            ? (int)OptionGroupSingleton<MedicOptions>.Instance.MedicShieldUses
-            : 1);
         if (!medicShield.LimitedUses ||
             !OptionGroupSingleton<MedicOptions>.Instance.ChangeTarget)
         {
@@ -418,24 +500,10 @@ public static class TownOfUsEventHandlers
         }
 
         CustomButtonSingleton<PlumberBlockButton>.Instance.ExtraUses = 0;
-        CustomButtonSingleton<PlumberBlockButton>.Instance.SetUses((int)OptionGroupSingleton<PlumberOptions>.Instance
-            .MaxBarricades);
         CustomButtonSingleton<TransporterTransportButton>.Instance.ExtraUses = 0;
-        CustomButtonSingleton<TransporterTransportButton>.Instance.SetUses((int)OptionGroupSingleton<TransporterOptions>
-            .Instance.MaxNumTransports);
 
         CustomButtonSingleton<WarlockKillButton>.Instance.Charge = 0f;
         CustomButtonSingleton<WarlockKillButton>.Instance.BurstActive = false;
-
-        // This sets the sabo cooldowns properly
-        if (ShipStatus.Instance.Systems.TryGetValue(SkeldDoorsSystemType.SystemType, out var systemType))
-        {
-            systemType.Cast<IDoorSystem>().SetInitialSabotageCooldown();
-        }
-        else if (ShipStatus.Instance.Systems.TryGetValue(ManualDoorsSystemType.SystemType, out var systemType2))
-        {
-            systemType2.Cast<IDoorSystem>().SetInitialSabotageCooldown();
-        }
     }
 
     [RegisterEvent]
@@ -514,9 +582,9 @@ public static class TownOfUsEventHandlers
     }
 
     [RegisterEvent]
-    public static void ClearBodiesAndResetPlayersEventHandler(StartMeetingEvent @event)
+    public static void ClearBodiesAndResetPlayersEventHandler(StartMeetingEvent _)
     {
-        Object.FindObjectsOfType<DeadBody>().ToList().ForEach(x => x.gameObject.Destroy());
+        Object.FindObjectsOfType<DeadBody>().ToList().ForEach(x => x.gameObject.DeepDestroy());
 
         foreach (var player in PlayerControl.AllPlayerControls)
         {
@@ -525,13 +593,14 @@ public static class TownOfUsEventHandlers
         }
 
         FakePlayer.ClearAll();
+        StonedPlayer.ClearAll();
         VitalsBodyPatches.ClearMissingPlayers();
     }
 
     [RegisterEvent]
-    public static void ClearBodiesAndResetPlayersEventHandler(RoundStartEvent @event)
+    public static void ClearBodiesAndResetPlayersEventHandler(RoundStartEvent _)
     {
-        Object.FindObjectsOfType<DeadBody>().ToList().ForEach(x => x.gameObject.Destroy());
+        Object.FindObjectsOfType<DeadBody>().ToList().ForEach(x => x.gameObject.DeepDestroy());
 
         foreach (var player in PlayerControl.AllPlayerControls)
         {
@@ -540,6 +609,7 @@ public static class TownOfUsEventHandlers
         }
 
         FakePlayer.ClearAll();
+        StonedPlayer.ClearAll();
         VitalsBodyPatches.ClearMissingPlayers();
     }
 
@@ -548,6 +618,28 @@ public static class TownOfUsEventHandlers
     {
         var player = reviveEvent.Player;
         VitalsBodyPatches.RemoveMissingPlayer(player.Data);
+
+        if (!player.AmOwner)
+        {
+            return;
+        }
+
+        foreach (var plr in PlayerControl.AllPlayerControls)
+        {
+            // this forces camo comms to reset for the revived player
+            var appearanceType = plr.GetAppearanceType();
+            if (appearanceType == TownOfUsAppearances.Swooper)
+            {
+                continue;
+            }
+
+            plr.SetCamouflage(false);
+
+            if (HudManagerPatches.CommsSaboActive() || plr.HasModifier<VenererCamouflageModifier>())
+            {
+                plr.SetCamouflage();
+            }
+        }
     }
 
     [RegisterEvent]
@@ -583,8 +675,7 @@ public static class TownOfUsEventHandlers
 
         foreach (var modifier in exiled.GetModifiers<GameModifier>().Where(x => x is IAnimated))
         {
-            var animatedMod = modifier as IAnimated;
-            if (animatedMod != null)
+            if (modifier is IAnimated animatedMod)
             {
                 animatedMod.IsVisible = false;
                 animatedMod.SetVisible();
@@ -609,20 +700,6 @@ public static class TownOfUsEventHandlers
             CustomButtonSingleton<SpellslingerHexButton>.Instance.SetActive(false, PlayerControl.LocalPlayer.Data.Role);
         }
 
-        if (target.AmOwner && HudManager.InstanceExists)
-        {
-            HudManager.Instance.SetHudActive(false);
-
-            if (!MeetingHud.Instance)
-            {
-                HudManager.Instance.SetHudActive(true);
-                if (OptionGroupSingleton<PostmortemOptions>.Instance.HideChatButton && OptionGroupSingleton<RoleOptions>.Instance.CurrentRoleDistribution() is not RoleDistribution.HideAndSeek)
-                {
-                    HudManager.Instance.Chat.chatButton.gameObject.SetActive(false);
-                }
-            }
-        }
-
         if (target.Data.Role is IAnimated animated)
         {
             animated.IsVisible = false;
@@ -637,8 +714,7 @@ public static class TownOfUsEventHandlers
 
         foreach (var modifier in target.GetModifiers<GameModifier>().Where(x => x is IAnimated))
         {
-            var animatedMod = modifier as IAnimated;
-            if (animatedMod != null)
+            if (modifier is IAnimated animatedMod)
             {
                 animatedMod.IsVisible = false;
                 animatedMod.SetVisible();
@@ -658,11 +734,8 @@ public static class TownOfUsEventHandlers
                     bombButton.ResetCooldownAndOrEffect();
                     break;
                 case JanitorRole:
-                    if (OptionGroupSingleton<JanitorOptions>.Instance.ResetCooldowns)
-                    {
-                        var cleanButton = CustomButtonSingleton<JanitorCleanButton>.Instance;
-                        cleanButton.ResetCooldownAndOrEffect();
-                    }
+                    var cleanButton = CustomButtonSingleton<JanitorCleanButton>.Instance;
+                    cleanButton.CheckReset(true);
 
                     break;
             }
@@ -689,13 +762,13 @@ public static class TownOfUsEventHandlers
 
             if (target.AmOwner)
             {
-                if (Minigame.Instance != null)
+                if (Minigame.Instance)
                 {
                     Minigame.Instance.Close();
                     Minigame.Instance.Close();
                 }
 
-                if (MapBehaviour.Instance != null)
+                if (MapBehaviour.Instance)
                 {
                     MapBehaviour.Instance.Close();
                     MapBehaviour.Instance.Close();
@@ -713,7 +786,7 @@ public static class TownOfUsEventHandlers
             return;
         }
 
-        if (MiscUtils.CurrentGamemode() is TouGamemode.HideAndSeek)
+        if (MiscUtils.CurrentGamemode() is not TouGamemode.Normal)
         {
             return;
         }
@@ -730,7 +803,7 @@ public static class TownOfUsEventHandlers
             {
                 if (PlayerControl.LocalPlayer.inVent)
                 {
-                    PlayerControl.LocalPlayer.GetModifier<GlitchHackedModifier>()!.ShowHacked();
+                    GlitchRole.RpcTriggerGlitchHack(PlayerControl.LocalPlayer, false);
                     PlayerControl.LocalPlayer.MyPhysics.RpcExitVent(Vent.currentVent.Id);
                     PlayerControl.LocalPlayer.MyPhysics.ExitAllVents();
                 }
@@ -772,7 +845,7 @@ public static class TownOfUsEventHandlers
 
     internal static IEnumerator CoSendSpecData(ClientData clientData)
     {
-        while (AmongUsClient.Instance == null || !AmongUsClient.Instance)
+        while (!AmongUsClient.Instance)
         {
             yield return null;
         }
@@ -782,7 +855,7 @@ public static class TownOfUsEventHandlers
             yield return null;
         }
 
-        while (PlayerControl.LocalPlayer.Data == null)
+        while (!PlayerControl.LocalPlayer.Data)
         {
             yield return null;
         }
@@ -811,9 +884,16 @@ public static class TownOfUsEventHandlers
         Rpc<SetSpectatorListRpc>.Instance.Send(PlayerControl.LocalPlayer, fakeDictionary);
     }
 
+    private static readonly HashSet<int> RulesShownToClientIds = [];
+
+    internal static void ResetRulesShownTracking()
+    {
+        RulesShownToClientIds.Clear();
+    }
+
     internal static IEnumerator CoSendRulesToPlayer(ClientData clientData)
     {
-        while (AmongUsClient.Instance == null || !AmongUsClient.Instance)
+        while (!AmongUsClient.Instance)
         {
             yield return null;
         }
@@ -823,7 +903,7 @@ public static class TownOfUsEventHandlers
             yield return null;
         }
 
-        while (PlayerControl.LocalPlayer.Data == null)
+        while (!PlayerControl.LocalPlayer.Data)
         {
             yield return null;
         }
@@ -831,6 +911,16 @@ public static class TownOfUsEventHandlers
         yield return new WaitForSecondsRealtime(1f);
 
         if (!PlayerControl.LocalPlayer.IsHost())
+        {
+            yield break;
+        }
+
+        if (!OptionGroupSingleton<HostSpecificOptions>.Instance.ShowRulesOnLobbyJoin.Value)
+        {
+            yield break;
+        }
+
+        if (RulesShownToClientIds.Contains(clientData.Id))
         {
             yield break;
         }
@@ -850,7 +940,8 @@ public static class TownOfUsEventHandlers
             yield break;
         }
 
-        ChatPatches.RpcSendLobbyRules(PlayerControl.LocalPlayer, joiningPlayer, rulesText, true);
+        RulesShownToClientIds.Add(clientData.Id);
+        ChatPatches.RpcSendLobbyRules(PlayerControl.LocalPlayer, joiningPlayer, rulesText);
     }
 
     [RegisterEvent]
@@ -868,7 +959,7 @@ public static class TownOfUsEventHandlers
             return;
         }
 
-        var pva = MeetingHud.Instance.playerStates.First(x => x.TargetPlayerId == player.PlayerId);
+        var pva = MeetingHud.Instance.playerStates.First(x => x.PlayerId == player.PlayerId);
 
         if (!pva)
         {
@@ -897,96 +988,9 @@ public static class TownOfUsEventHandlers
         HudManager.Instance.SetHudActive(false);
     }
 
-    private static IEnumerator CoAnimateDeath(PlayerVoteArea voteArea)
-    {
-        var animDic = new Dictionary<AnimationClip, AnimationClip>
-        {
-            { TouAssets.MeetingDeathBloodAnim1.LoadAsset(), TouAssets.MeetingDeathAnim1.LoadAsset() },
-            { TouAssets.MeetingDeathBloodAnim2.LoadAsset(), TouAssets.MeetingDeathAnim2.LoadAsset() },
-            { TouAssets.MeetingDeathBloodAnim3.LoadAsset(), TouAssets.MeetingDeathAnim3.LoadAsset() },
-            { TouAssets.MeetingDeathBloodAnim4.LoadAsset(), TouAssets.MeetingDeathAnim4.LoadAsset() }
-        };
-        var trueAnim = animDic.Random();
-        var animation = Object.Instantiate(TouAssets.MeetingDeathPrefab.LoadAsset(), voteArea.transform);
-        animation.transform.localPosition = new Vector3(-0.8f, 0, 0);
-        animation.transform.localScale = new Vector3(0.375f, 0.375f, 1f);
-        animation.gameObject.layer = animation.transform.GetChild(0).gameObject.layer = voteArea.gameObject.layer;
-
-        var animationRend = animation.GetComponent<SpriteRenderer>();
-        animationRend.material = voteArea.PlayerIcon.cosmetics.currentBodySprite.BodySprite.material;
-        var r = animationRend.gameObject.GetComponent<RainbowBehaviour>();
-        if (r == null)
-        {
-            r = animationRend.gameObject.AddComponent<RainbowBehaviour>();
-        }
-
-        r.AddRend(animationRend, voteArea.PlayerIcon.ColorId);
-
-        voteArea.Overlay.gameObject.SetActive(false);
-        animation.gameObject.SetActive(false);
-
-        Coroutines.Start(MiscUtils.CoFlash(Palette.ImpostorRed, 0.5f, 0.15f));
-        var seconds = Random.RandomRange(0.4f, 1.1f);
-        // if there's less than 6 players alive, animation will play instantly
-        if (Helpers.GetAlivePlayers().Count <= 5)
-        {
-            seconds = 0.01f;
-        }
-
-        yield return new WaitForSeconds(seconds);
-
-        voteArea.PlayerIcon.gameObject.SetActive(false);
-        animation.gameObject.SetActive(true);
-        var bodysAnim = animation.GetComponent<SpriteAnim>();
-
-        var bloodAnim = animation.transform.GetChild(0).GetComponent<SpriteAnim>();
-
-        bloodAnim.Play(trueAnim.Key);
-        bodysAnim.Play(trueAnim.Value);
-
-        bodysAnim.SetSpeed(1.05f);
-        bloodAnim.SetSpeed(1.05f);
-        var bodyAnimLength = bodysAnim.m_currAnim.length;
-        var isRhm = (trueAnim.Key == TouAssets.MeetingDeathBloodAnim4.LoadAsset());
-
-        if (isRhm)
-        {
-            SoundManager.Instance.PlaySound(TouAudio.LaserKillSound.LoadAsset(), false);
-            yield return new WaitForSeconds(bodyAnimLength);
-        }
-        else
-        {
-            yield return new WaitForSeconds(0.1f);
-            SoundManager.Instance.PlaySound(voteArea.GetPlayer()!.KillSfx, false);
-            yield return new WaitForSeconds(bodyAnimLength - 0.25f);
-        }
-
-        // For some reason this can just fail? I don't get it either, fails getting the GameObject the component is attached to.
-        try
-        {
-            voteArea.Overlay.gameObject.SetActive(true);
-        }
-        catch
-        {
-            // ignored
-        }
-        animation.Destroy();
-        // For some reason this can just fail? I don't get it either, fails getting the GameObject the component is attached to.
-        try
-        {
-            voteArea.XMark.gameObject.SetActive(true);
-            Coroutines.Start(MiscUtils.BetterBloop(voteArea.XMark.transform));
-        }
-        catch
-        {
-            // ignored
-        }
-        SoundManager.Instance.PlaySound(MeetingHud.Instance.MeetingIntro.PlayerDeadSound, false);
-    }
-
     private static void HandleMeetingMurder(MeetingHud instance, PlayerControl source, PlayerControl target)
     {
-        if (MeetingHud.Instance.CurrentState == MeetingHud.VoteStates.Animating)
+        if (MeetingHud.Instance.CurrentState == MeetingHud.MeetingStates.Animating)
         {
             if (target.AmOwner)
             {
@@ -999,7 +1003,7 @@ public static class TownOfUsEventHandlers
                 MeetingMenu.Instances.Do(x => x.HideSingle(target.PlayerId));
             }
 
-            var targetVoteAreaEarly = instance.playerStates.First(x => x.TargetPlayerId == target.PlayerId);
+            var targetVoteAreaEarly = instance.playerStates.First(x => x.PlayerId == target.PlayerId);
 
             if (!targetVoteAreaEarly)
             {
@@ -1023,7 +1027,7 @@ public static class TownOfUsEventHandlers
         }
 
         // To handle murders during a meeting
-        var targetVoteArea = instance.playerStates.First(x => x.TargetPlayerId == target.PlayerId);
+        var targetVoteArea = instance.playerStates.First(x => x.PlayerId == target.PlayerId);
 
         if (!targetVoteArea)
         {
@@ -1036,24 +1040,17 @@ public static class TownOfUsEventHandlers
         }
 
         targetVoteArea.AmDead = true;
-        targetVoteArea.Overlay.gameObject.SetActive(true);
-        targetVoteArea.Overlay.color = Color.white;
-        targetVoteArea.XMark.gameObject.SetActive(false);
-        targetVoteArea.XMark.transform.localScale = Vector3.one;
 
-        if (Minigame.Instance != null)
+        if (Minigame.Instance)
         {
             Minigame.Instance.Close();
             Minigame.Instance.Close();
         }
 
-        targetVoteArea.Overlay.gameObject.SetActive(false);
         if (target.GetRoleWhenAlive() is MayorRole mayor && mayor.Revealed)
         {
             MayorRole.DestroyReveal(targetVoteArea);
         }
-
-        Coroutines.Start(CoAnimateDeath(targetVoteArea));
 
         // hide meeting menu buttons on the victim's screen
         if (target.AmOwner)
@@ -1069,25 +1066,25 @@ public static class TownOfUsEventHandlers
             {
                 if (swapperRole.Swap1 == targetVoteArea)
                 {
-                    swapperRole.Swap1 = null;
+                    swapperRole.Swap1 = null!;
                 }
                 else if (swapperRole.Swap2 == targetVoteArea)
                 {
-                    swapperRole.Swap2 = null;
+                    swapperRole.Swap2 = null!;
                 }
             }
         }
 
         foreach (var pva in instance.playerStates)
         {
-            if (pva.VotedFor != target.PlayerId || pva.AmDead)
+            if (pva.VotedForId != target.PlayerId || pva.AmDead)
             {
                 continue;
             }
 
             pva.UnsetVote();
 
-            var voteAreaPlayer = MiscUtils.PlayerById(pva.TargetPlayerId);
+            var voteAreaPlayer = MiscUtils.PlayerById(pva.PlayerId);
 
             if (voteAreaPlayer == null)
             {
@@ -1098,12 +1095,7 @@ public static class TownOfUsEventHandlers
             var votes = voteData.Votes.RemoveAll(x => x.Suspect == target.PlayerId);
             voteData.VotesRemaining += votes;
 
-            if (!voteAreaPlayer.AmOwner)
-            {
-                continue;
-            }
-
-            instance.ClearVote();
+            instance.ClearVote(pva.PlayerId, voteAreaPlayer.AmOwner);
         }
 
         instance.SetDirtyBit(1U);
@@ -1115,7 +1107,7 @@ public static class TownOfUsEventHandlers
     }
 
     [RegisterEvent]
-    public static void VotingCompleteHandler(VotingCompleteEvent @event)
+    public static void VotingCompleteHandler(VotingCompleteEvent _)
     {
         if (Minigame.Instance)
         {

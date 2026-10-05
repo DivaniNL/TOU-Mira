@@ -2,7 +2,6 @@
 using MiraAPI.GameOptions;
 using MiraAPI.Hud;
 using MiraAPI.Modifiers;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Modifiers.Impostor;
 using TownOfUs.Options.Roles.Impostor;
 using TownOfUs.Roles.Impostor;
@@ -13,7 +12,7 @@ namespace TownOfUs.Buttons.Impostor;
 public sealed class AmbusherAmbushButton : TownOfUsKillRoleButton<AmbusherRole, PlayerControl>, IKillButton,
     IDiseaseableButton
 {
-    public override string Name => TouLocale.GetParsed("TouRoleAmbusherAmbush", "Ambush");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.AmbusherAmbush", "Ambush");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Impostor;
     public override float Cooldown => PlayerControl.LocalPlayer.GetKillCooldown();

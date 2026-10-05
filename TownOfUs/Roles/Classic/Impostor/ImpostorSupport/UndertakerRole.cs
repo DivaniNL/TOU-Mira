@@ -22,7 +22,7 @@ public sealed class UndertakerRole(IntPtr cppPtr)
 {
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data.Role is not UndertakerRole || Player.HasDied() || !Player.AmOwner ||
+        if (!Player || Player.Data.Role is not UndertakerRole || Player.HasDied() || !Player.AmOwner ||
             MeetingHud.Instance || (!HudManager.Instance.UseButton.isActiveAndEnabled &&
                                     !HudManager.Instance.PetButton.isActiveAndEnabled))
         {
@@ -37,15 +37,13 @@ public sealed class UndertakerRole(IntPtr cppPtr)
 
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<AltruistRole>());
     public DoomableType DoomHintType => DoomableType.Death;
-    public string LocaleKey => "Undertaker";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Undertaker";
+    public string RoleMedDescriptionLocale => $"TownOfUsMira.Role.{IdPart}.TabDescription";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -55,6 +53,7 @@ public sealed class UndertakerRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Undertaker.LoadAsset(), "TouMira.Role.Impostor.Undertaker", 1.45f),
         UseVanillaKillButton = true,
         CanUseVent = OptionGroupSingleton<UndertakerOptions>.Instance.CanVent,
         Icon = TouRoleIcons.Undertaker,
@@ -68,15 +67,15 @@ public sealed class UndertakerRole(IntPtr cppPtr)
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Drag", "Drag"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}DragWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Drag", "Drag"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Drag.WikiDescription"),
                     TouImpAssets.DragSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Drop", "Drop"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}DropWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Drop", "Drop"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Drop.WikiDescription"),
                     TouImpAssets.DropSprite)
-            };
+            ];
         }
     }
 

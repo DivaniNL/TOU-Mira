@@ -1,12 +1,10 @@
 using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities;
-using TownOfUs.Events;
 using TownOfUs.Modifiers;
-using TownOfUs.Modifiers.Neutral;
 using TownOfUs.Modules;
+using TownOfUs.Modules.Components;
 using TownOfUs.Options.Roles.Crewmate;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
@@ -15,7 +13,7 @@ namespace TownOfUs.Buttons.Crewmate;
 
 public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, PlayerControl>
 {
-    public override string Name => "Knight";
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.MonarchKnight");
     public override BaseKeybind Keybind => Keybinds.SecondaryAction;
     public override Color TextOutlineColor => TownOfUsColors.Monarch;
     public override float Cooldown => OptionGroupSingleton<MonarchOptions>.Instance.KnightCooldown + MapCooldown;
@@ -25,8 +23,7 @@ public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, Player
     public PlayerControl? _knightedTarget;
     private bool _isProcessingClick;
 
-    public static bool Usable =>
-        OptionGroupSingleton<MonarchOptions>.Instance.FirstRoundUse || TutorialManager.InstanceExists || DeathEventHandlers.CurrentRound > 1;
+    public override bool UsableFirstRound => OptionGroupSingleton<MonarchOptions>.Instance.FirstRoundUse;
 
     public override bool CanUse()
     {
@@ -35,12 +32,17 @@ public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, Player
             return false;
         }
 
-        if (PlayerControl.LocalPlayer.HasDied() || !Usable)
+        if (PlayerControl.LocalPlayer.HasDied() && !UsableInDeath)
         {
             return false;
         }
 
         if (HudManager.Instance.Chat.IsOpenOrOpening || MeetingHud.Instance)
+        {
+            return false;
+        }
+
+        if (!UsableFirstRound && HudManagerHelper.Instance.CurrentRound == 1 && !TutorialManager.InstanceExists)
         {
             return false;
         }
@@ -81,8 +83,7 @@ public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, Player
 
         try
         {
-            if (!CanClick() || PlayerControl.LocalPlayer.HasModifier<GlitchHackedModifier>() ||
-                PlayerControl.LocalPlayer.GetModifiers<DisabledModifier>().Any(x => !x.CanUseAbilities))
+            if (!CanClick())
             {
                 return;
             }
@@ -112,7 +113,7 @@ public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, Player
         if (EffectActive)
         {
             var notif2 = Helpers.CreateAndShowNotification(
-                $"<b>Knighting has been cancelled.</b>",
+                $"<b>{MiraLocaleManager.Get("TownOfUsMira.Role.MonarchKnightCancelled")}</b>",
                 Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Monarch.LoadAsset());
             notif2.Text.SetOutlineThickness(0.35f);
             _knightedTarget = null;
@@ -127,11 +128,11 @@ public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, Player
             return;
         }
 
-        OverrideName("Knighting");
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.MonarchKnighting"));
 
         _knightedTarget = Target;
         var notif = Helpers.CreateAndShowNotification(
-            $"<b>You chose to knight {_knightedTarget.CachedPlayerData.PlayerName}. They will be knighted in {OptionGroupSingleton<MonarchOptions>.Instance.KnightDelay} second(s)!</b>",
+            $"<b>{MiraLocaleManager.Get("TownOfUsMira.Role.MonarchKnightChosen") .Replace("<player>", _knightedTarget.CachedPlayerData.PlayerName) .Replace("<seconds>", OptionGroupSingleton<MonarchOptions>.Instance.KnightDelay.ToString(TownOfUsPlugin.Culture))}</b>",
             Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Monarch.LoadAsset());
         notif.Text.SetOutlineThickness(0.35f);
 
@@ -148,7 +149,7 @@ public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, Player
 
     public override void OnEffectEnd()
     {
-        OverrideName("Knight");
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.MonarchKnight"));
 
         if (_knightedTarget == null) return;
 
@@ -160,13 +161,10 @@ public sealed class MonarchKnightButton : TownOfUsRoleButton<MonarchRole, Player
             if (TextOutlineColor != Color.clear)
             {
                 SetTextOutline(TextOutlineColor);
-                if (Button != null)
-                {
-                    Button.usesRemainingSprite.color = TextOutlineColor;
-                }
+                Button?.usesRemainingSprite.color = TextOutlineColor;
             }
 
-            TownOfUsColors.UseBasic = LocalSettingsTabSingleton<TownOfUsLocalRoleSettings>.Instance
+            TownOfUsColors.UseBasic = LocalSettingsTabSingleton<TouLocalTabPlayers>.Instance
                 .UseCrewmateTeamColorToggle.Value;
         }
 

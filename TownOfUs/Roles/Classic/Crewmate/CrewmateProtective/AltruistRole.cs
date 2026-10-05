@@ -22,27 +22,23 @@ public sealed class AltruistRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
 {
     public override bool IsAffectedByComms => false;
     public DoomableType DoomHintType => DoomableType.Death;
-    public string LocaleKey => "Altruist";
+    public string IdPart => "Altruist";
     public static bool IsReviveInProgress { get; private set; }
     public static string ReviveString()
     {
-        switch ((ReviveType)OptionGroupSingleton<AltruistOptions>.Instance.ReviveMode.Value)
+        return (ReviveType)OptionGroupSingleton<AltruistOptions>.Instance.ReviveMode.Value switch
         {
-            case ReviveType.Sacrifice:
-                return "Sacrifice";
-            case ReviveType.GroupSacrifice:
-                return "GroupSacrifice";
-        }
-        return string.Empty;
+            ReviveType.Sacrifice => ".Sacrifice",
+            ReviveType.GroupSacrifice => ".GroupSacrifice",
+            _ => string.Empty,
+        };
     }
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription{ReviveString()}");
+    public string RoleLongDescription => MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.TabDescription{ReviveString()}");
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -51,12 +47,12 @@ public sealed class AltruistRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Revive", "Revive"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}Revive{ReviveString()}WikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Revive", "Revive"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Revive{ReviveString()}.WikiDescription"),
                     TouCrewAssets.ReviveSprite)
-            };
+            ];
         }
     }
 
@@ -66,6 +62,7 @@ public sealed class AltruistRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Altruist.LoadAsset(), "TouMira.Role.Crewmate.Altruist", 1.45f),
         IntroSound = TouAudio.AltruistReviveSound,
         OptionsScreenshot = TouBanners.CrewmateRoleBanner,
         Icon = TouRoleIcons.Altruist
@@ -171,8 +168,8 @@ public sealed class AltruistRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
 
         if (!MeetingHud.Instance && (!Player.HasDied() || killOnStart))
         {
-            var revivedText = TouLocale.GetParsed("TouRoleAltruistRevivedNotif");
-            var successText = TouLocale.GetParsed("TouRoleAltruistReviveSuccessNotif")
+            var revivedText = MiraLocaleManager.Get("TownOfUsMira.Role.AltruistRevivedNotif");
+            var successText = MiraLocaleManager.Get("TownOfUsMira.Role.AltruistReviveSuccessNotif")
                 .Replace("<player>", dead.Data.PlayerName);
 
             ReviveUtilities.RevivePlayer(
@@ -209,7 +206,7 @@ public sealed class AltruistRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITownOfU
                     Player.RemoveModifier<AltruistArrowModifier>();
                 }
 
-                if (!dead.HasModifier<AltruistArrowModifier>() && dead != PlayerControl.LocalPlayer)
+                if (!dead.HasModifier<AltruistArrowModifier>() && !dead.AmOwner)
                 {
                     dead.AddModifier<AltruistArrowModifier>(PlayerControl.LocalPlayer, Color.white);
                 }

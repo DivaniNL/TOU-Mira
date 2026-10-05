@@ -1,5 +1,4 @@
 using Il2CppInterop.Runtime.Attributes;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Interfaces;
 using UnityEngine;
 
@@ -7,7 +6,7 @@ namespace TownOfUs.Modifiers.Game.Crewmate;
 
 public sealed class TestTimeLordModifier : TouGameModifier, IWikiDiscoverable, IButtonModifier
 {
-    public override string LocaleKey => "TestTimeLord";
+    public override string IdPart => "TestTimeLord";
     public override string ModifierName => "Test Time Lord";
     public override string IntroInfo => "Test modifier for Time Lord rewind ability";
     public override LoadableAsset<Sprite>? ModifierIcon => TouRoleIcons.TimeLord; // Use Time Lord role icon
@@ -30,10 +29,10 @@ public sealed class TestTimeLordModifier : TouGameModifier, IWikiDiscoverable, I
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
+            return
+            [
                 new("Rewind", "Rewind time for everyone (for testing)", TouCrewAssets.RewindSprite)
-            };
+            ];
         }
     }
 

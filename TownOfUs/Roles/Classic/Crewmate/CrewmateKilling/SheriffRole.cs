@@ -4,6 +4,7 @@ using MiraAPI.GameOptions;
 using MiraAPI.Hud;
 using MiraAPI.Modifiers;
 using MiraAPI.Roles;
+using MiraAPI.Utilities;
 using Reactor.Networking.Attributes;
 using TownOfUs.Buttons.Crewmate;
 using TownOfUs.Modifiers.Game.Alliance;
@@ -18,15 +19,12 @@ public sealed class SheriffRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
     public override bool IsAffectedByComms => false;
     public bool HasMisfired { get; set; }
     public DoomableType DoomHintType => DoomableType.Relentless;
-    public string LocaleKey => "Sheriff";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Sheriff";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -35,12 +33,12 @@ public sealed class SheriffRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Shoot", "Shoot"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}ShootWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Shoot", "Shoot"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Shoot.WikiDescription"),
                     TouCrewAssets.SheriffShootSprite)
-            };
+            ];
         }
     }
 
@@ -51,6 +49,7 @@ public sealed class SheriffRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Sheriff.LoadAsset(), "TouMira.Role.Crewmate.Sheriff", 1.45f),
         Icon = TouRoleIcons.Sheriff,
         OptionsScreenshot = TouBanners.SheriffRoleBanner,
         IntroSound = TouAudio.ImpostorIntroSound
@@ -61,24 +60,24 @@ public sealed class SheriffRole(IntPtr cppPtr) : CrewmateRole(cppPtr), ITouCrewR
     {
         var stringB = new StringBuilder();
         stringB.AppendLine(TownOfUsPlugin.Culture,
-            $"{RoleColor.ToTextColor()}{TouLocale.Get("YouAreA")}<b> {RoleName}.</b></color>");
+            $"{RoleColor.ToTextColor()}{MiraLocaleManager.Get("YouAreA")}<b> {this.GetRoleName()}.</b></color>");
         stringB.AppendLine(TownOfUsPlugin.Culture,
-            $"<size=60%>{TouLocale.Get("Alignment")}: <b>{MiscUtils.GetParsedRoleAlignment(RoleAlignment, true)}</b></size>");
+            $"<size=60%>{MiraLocaleManager.Get("Alignment")}: <b>{MiscUtils.GetParsedRoleAlignment(RoleAlignment, true)}</b></size>");
         stringB.Append("<size=70%>");
         if (PlayerControl.LocalPlayer.HasModifier<EgotistModifier>())
         {
-            stringB.AppendLine(TownOfUsPlugin.Culture, $"{TouLocale.GetParsed($"TouRole{LocaleKey}TabDescriptionEgo")}");
+            stringB.AppendLine(TownOfUsPlugin.Culture, $"{MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.TabDescriptionEgo")}");
         }
         else
         {
-            stringB.AppendLine(TownOfUsPlugin.Culture, $"{RoleLongDescription}");
+            stringB.AppendLine(TownOfUsPlugin.Culture, $"{this.GetRoleLongDescription()}");
             var addedText = "d";
             if (!CustomButtonSingleton<SheriffShootButton>.Instance.FailedShot)
             {
                 var missType = OptionGroupSingleton<SheriffOptions>.Instance.MisfireType;
                 addedText = $"Kills{missType}";
             }
-            stringB.AppendLine(TownOfUsPlugin.Culture, $"<b>{TouLocale.GetParsed($"TouRole{LocaleKey}TabMisfire{addedText}")}</b>");
+            stringB.AppendLine(TownOfUsPlugin.Culture, $"<b>{MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.TabMisfire{addedText}")}</b>");
         }
 
         return stringB;

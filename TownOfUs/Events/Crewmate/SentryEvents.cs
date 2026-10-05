@@ -104,7 +104,7 @@ public static class SentryEvents
             CustomButtonSingleton<SentryPortableCameraButton>.Instance.SetActive(true, sentryRole);
             CustomButtonSingleton<SentryPortableCameraSecondaryButton>.Instance.SetActive(true, sentryRole);
 
-            var notifText = TouLocale.GetParsed("TouRoleSentryPortableCameraUnlocked", "Portable Cameras Unlocked!");
+            var notifText = MiraLocaleManager.Get("TownOfUsMira.Role.SentryPortableCameraUnlocked", "Portable Cameras Unlocked!");
             var notif = Helpers.CreateAndShowNotification(
                 $"<b>{TownOfUsColors.Sentry.ToTextColor()}{notifText}</color></b>",
                 Color.white,
@@ -151,7 +151,7 @@ public static class SentryEvents
                 CustomButtonSingleton<SentryPortableCameraButton>.Instance.SetActive(true, sentryRole);
                 CustomButtonSingleton<SentryPortableCameraSecondaryButton>.Instance.SetActive(true, sentryRole);
 
-                var notifText = TouLocale.GetParsed("TouRoleSentryPortableCameraUnlocked", "Portable Cameras Unlocked!");
+                var notifText = MiraLocaleManager.Get("TownOfUsMira.Role.SentryPortableCameraUnlocked", "Portable Cameras Unlocked!");
                 var notif = Helpers.CreateAndShowNotification(
                     $"<b>{TownOfUsColors.Sentry.ToTextColor()}{notifText}</color></b>",
                     Color.white,
@@ -165,7 +165,7 @@ public static class SentryEvents
     }
 
     [RegisterEvent]
-    public static void EjectionEventHandler(EjectionEvent @event)
+    public static void EjectionEventHandler(EjectionEvent _)
     {
         if (OptionGroupSingleton<SentryOptions>.Instance.DeployedCamerasVisibility is SentryDeployedCamerasVisibility.AfterMeeting)
         {
@@ -178,10 +178,7 @@ public static class SentryEvents
 
                 cameraPair.Key.gameObject.SetActive(true);
                 var spriteRenderer = cameraPair.Key.gameObject.GetComponent<SpriteRenderer>();
-                if (spriteRenderer != null)
-                {
-                    spriteRenderer.color = Color.white;
-                }
+                spriteRenderer?.color = Color.white;
             }
         }
 
@@ -199,7 +196,7 @@ public static class SentryEvents
 
                     if (cameraPair.Value <= 1)
                     {
-                        if (ShipStatus.Instance != null && ShipStatus.Instance.AllCameras != null)
+                        if (ShipStatus.Instance && ShipStatus.Instance.AllCameras != null)
                         {
                             var allCameras = ShipStatus.Instance.AllCameras.ToList();
                             if (allCameras.Contains(cameraPair.Key))

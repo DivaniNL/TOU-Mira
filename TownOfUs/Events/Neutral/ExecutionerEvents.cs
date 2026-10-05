@@ -10,9 +10,11 @@ using MiraAPI.Modifiers;
 using MiraAPI.Roles;
 using MiraAPI.Utilities;
 using TownOfUs.Buttons.Neutral;
-using TownOfUs.Modifiers;
 using TownOfUs.Modifiers.Neutral;
+using TownOfUs.Modules;
+using TownOfUs.Modules.Components;
 using TownOfUs.Options.Roles.Neutral;
+using TownOfUs.Patches;
 using TownOfUs.Roles.Neutral;
 using UnityEngine;
 
@@ -71,16 +73,14 @@ public static class ExecutionerEvents
         var exe = CustomRoleUtils.GetActiveRolesOfType<ExecutionerRole>()
             .FirstOrDefault(x => x.AboutToWin && !x.Player.HasDied());
 
-        if (winOption is ExeWinOptions.EndsGame)
+        var evilTarget = exe != null && exe.Target != null && !exe.Target.IsCrewmate();
+        if (evilTarget)
         {
-            if (exe != null && exe.Target != null && !exe.Target.IsCrewmate())
-            {
-                winOption = ExeWinOptions.Torments;
-            }
-            else
-            {
-                return;
-            }
+            winOption = ExeWinOptions.Nothing;
+        }
+        else if (winOption is ExeWinOptions.EndsGame)
+        {
+            return;
         }
 
         if (exe != null)
@@ -97,36 +97,51 @@ public static class ExecutionerEvents
             if (exe.Player.AmOwner)
             {
                 var notif1 = Helpers.CreateAndShowNotification(
-                    $"<b>{TouLocale.GetParsed("TouRoleExecutionerWonSelf").Replace("<role>", $"{TownOfUsColors.Executioner.ToTextColor()}{exe.RoleName}</color>")}</b>",
+                    $"<b>{MiraLocaleManager.Get("TownOfUsMira.Role.ExecutionerWonSelf").Replace("<role>", $"{TownOfUsColors.Executioner.ToTextColor()}{exe.GetRoleName()}</color>")}</b>",
                     Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Executioner.LoadAsset());
 
                 notif1.AdjustNotification();
 
-                PlayerControl.LocalPlayer.RpcPlayerExile();
+                PlayerControl.LocalPlayer.DelayExile();
 
                 if (winOption is ExeWinOptions.Torments)
                 {
                     CustomButtonSingleton<ExeTormentButton>.Instance.SetActive(true, exe);
-                    DeathHandlerModifier.RpcUpdateLocalDeathHandler(PlayerControl.LocalPlayer,
-                        "DiedToWinning", DeathEventHandlers.CurrentRound, DeathHandlerOverride.SetTrue,
+                    GameHistory.RpcUpdateLocalDeathHandler(PlayerControl.LocalPlayer, PlayerControl.LocalPlayer,
+                        "DiedToWinning", HudManagerHelper.Instance.CurrentRound, DeathHandlerOverride.SetTrue,
                         lockInfo: DeathHandlerOverride.SetTrue);
                     var notif2 = Helpers.CreateAndShowNotification(
-                        $"<b>{TouLocale.GetParsed("TouRoleExecutionerTormentFeedback")}</b>",
+                        $"<b>{MiraLocaleManager.Get("TownOfUsMira.Role.ExecutionerTormentFeedback")}</b>",
                         Color.white, new Vector3(0f, 0.85f, -20f));
                     notif2.AdjustNotification();
                 }
                 else
                 {
-                    DeathHandlerModifier.RpcUpdateLocalDeathHandler(PlayerControl.LocalPlayer,
-                        "DiedToWinning", DeathEventHandlers.CurrentRound, DeathHandlerOverride.SetFalse,
+                    GameHistory.RpcUpdateLocalDeathHandler(PlayerControl.LocalPlayer, PlayerControl.LocalPlayer,
+                        "DiedToWinning", HudManagerHelper.Instance.CurrentRound, DeathHandlerOverride.SetFalse,
                         lockInfo: DeathHandlerOverride.SetTrue);
                 }
             }
             else
             {
+                string message;
+                LoadableAsset<Sprite> icon;
+
+                if (OptionGroupSingleton<ExecutionerOptions>.Instance.ExeAnonymizeWin.Value)
+                {
+                    message = MiraLocaleManager.Get("TouNeutAnonymousVictoryMessage");
+                    icon = TouRoleIcons.Neutral;
+                }
+                else
+                {
+                    message = $"<b>{MiraLocaleManager.Get("TownOfUsMira.Role.ExecutionerWonOther")
+                        .Replace("<role>", $"{TownOfUsColors.Executioner.ToTextColor()}{exe.GetRoleName()}</color>")}</b>";
+                    icon = TouRoleIcons.Executioner;
+                }
+
                 var notif1 = Helpers.CreateAndShowNotification(
-                    $"<b>{TouLocale.GetParsed("TouRoleExecutionerWonOther").Replace("<player>", exe.Player.Data.PlayerName).Replace("<role>", $"{TownOfUsColors.Executioner.ToTextColor()}{exe.RoleName}</color>")}</b>",
-                    Color.white, new Vector3(0f, 1f, -20f), spr: TouRoleIcons.Executioner.LoadAsset());
+                    message.Replace("<player>", exe.Player.Data.PlayerName),
+                    Color.white, new Vector3(0f, 1f, -20f), spr: icon.LoadAsset());
 
                 notif1.AdjustNotification();
             }
@@ -134,20 +149,27 @@ public static class ExecutionerEvents
     }
 
     [RegisterEvent]
-    public static void HandleVoteEventHandler(HandleVoteEvent @event)
+    public static void VotingCompleteEventHandler(VotingCompleteEvent _)
     {
-        var votingPlayer = @event.Player;
-        var suspectPlayer = @event.TargetPlayerInfo;
-
-        if (suspectPlayer == null || !suspectPlayer._object.TryGetModifier<ExecutionerTargetModifier>(out var exeMod))
+        var states = MeetingHudGetVotesPatch.States;
+        var exes = CustomRoleUtils.GetActiveRolesOfType<ExecutionerRole>();
+        if (!exes.HasAny())
         {
             return;
         }
-
-        var exe = GameData.Instance.GetPlayerById(exeMod.OwnerId).Object;
-        if (exe != null && !exe.HasDied() && exe.Data.Role is ExecutionerRole exeRole)
+        foreach (var state in states)
         {
-            exeRole.Voters.Add(votingPlayer.PlayerId);
+            if (state.SkippedVote || state.AmDead)
+            {
+                continue;
+            }
+            foreach (var exe in exes)
+            {
+                if (exe.Target?.PlayerId == state.VotedForId)
+                {
+                    exe.Voters.Add(state.VoterId);
+                }
+            }
         }
     }
 

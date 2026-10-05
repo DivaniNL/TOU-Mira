@@ -2,7 +2,6 @@
 using Il2CppSystem.Text;
 using MiraAPI.GameOptions;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using TownOfUs.Options.Modifiers;
 using TownOfUs.Roles.Crewmate;
 using UnityEngine;
@@ -11,18 +10,22 @@ namespace TownOfUs.Modifiers.Game.Crewmate;
 
 public sealed class TaskmasterModifier : TouGameModifier, IWikiDiscoverable
 {
-    public override string LocaleKey => "Taskmaster";
-    public override string ModifierName => TouLocale.Get($"TouModifier{LocaleKey}");
-    public override string IntroInfo => TouLocale.GetParsed($"TouModifier{LocaleKey}IntroBlurb");
+    public override ModifierUiConfiguration Configuration => new(
+        TownOfUsColors.Taskmaster,
+        TmpSpriteUtils.CreateSpriteAsset(TouModifierIcons.Taskmaster.LoadAsset(),
+            "TouMira.Modifier.Crewmate.Taskmaster", 1.45f));
+    public override string IdPart => "Taskmaster";
+    public override string ModifierName => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}");
+    public override string IntroInfo => MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.IntroBlurb");
 
     public override string GetDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}TabDescription");
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.TabDescription");
     }
 
     public string GetAdvancedDescription()
     {
-        return TouLocale.GetParsed($"TouModifier{LocaleKey}WikiDescription")
+        return MiraLocaleManager.Get($"TownOfUsMira.Modifier.{IdPart}.WikiDescription")
                + MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -74,7 +77,7 @@ public sealed class TaskmasterModifier : TouGameModifier, IWikiDiscoverable
                 taskText = taskText.Replace(Environment.NewLine, "");
 
                 var notif1 = Helpers.CreateAndShowNotification(
-                    $"<b>{TownOfUsColors.Taskmaster.ToTextColor()}{TouLocale.GetParsed("TouModifierTaskmasterTaskNotif").Replace("<taskName>", taskText)}</b></color>",
+                    $"<b>{TownOfUsColors.Taskmaster.ToTextColor()}{MiraLocaleManager.Get("TownOfUsMira.Modifier.TaskmasterTaskNotif").Replace("<taskName>", taskText)}</b></color>",
                     Color.white, new Vector3(0f, 1f, -20f), spr: TouModifierIcons.Taskmaster.LoadAsset());
                 notif1.AdjustNotification();
             }

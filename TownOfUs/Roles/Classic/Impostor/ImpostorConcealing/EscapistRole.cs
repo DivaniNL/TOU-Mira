@@ -4,6 +4,7 @@ using MiraAPI.Events;
 using MiraAPI.GameOptions;
 using MiraAPI.Patches.Stubs;
 using MiraAPI.Roles;
+using MiraAPI.Utilities;
 using Reactor.Networking.Attributes;
 using Reactor.Utilities.Extensions;
 using TownOfUs.Events.TouEvents;
@@ -19,39 +20,36 @@ public sealed class EscapistRole(IntPtr cppPtr)
     : ImpostorRole(cppPtr), ITownOfUsRole, IWikiDiscoverable, IDoomable, ICrewVariant
 {
     [HideFromIl2Cpp] public Vector2? MarkedLocation { get; set; }
-    [HideFromIl2Cpp] public GameObject? EscapeMark { get; set; }
+    [HideFromIl2Cpp] public GameObject EscapeMark { get; set; }
 
     public void FixedUpdate()
     {
-        if (Player == null || Player.Data.Role is not EscapistRole || Player.HasDied())
+        if (!Player || Player.Data.Role is not EscapistRole || Player.HasDied())
         {
             return;
         }
 
-        if (EscapeMark != null)
+        if (EscapeMark)
         {
             EscapeMark.SetActive(PlayerControl.LocalPlayer.IsImpostorAligned() || (PlayerControl.LocalPlayer.HasDied() &&
                                                                             OptionGroupSingleton<GeneralOptions>
                                                                                 .Instance.TheDeadKnow));
             if (MarkedLocation == null)
             {
-                EscapeMark.gameObject.Destroy();
-                EscapeMark = null;
+                EscapeMark.Destroy();
+                EscapeMark = null!;
             }
         }
     }
 
     public RoleBehaviour CrewVariant => RoleManager.Instance.GetRole((RoleTypes)RoleId.Get<TransporterRole>());
     public DoomableType DoomHintType => DoomableType.Protective;
-    public string LocaleKey => "Escapist";
-    public string RoleName => TouLocale.Get($"TouRole{LocaleKey}");
-    public string RoleDescription => TouLocale.GetParsed($"TouRole{LocaleKey}IntroBlurb");
-    public string RoleLongDescription => TouLocale.GetParsed($"TouRole{LocaleKey}TabDescription");
+    public string IdPart => "Escapist";
 
     public string GetAdvancedDescription()
     {
         return
-            TouLocale.GetParsed($"TouRole{LocaleKey}WikiDescription") +
+            MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}.WikiDescription") +
             MiscUtils.AppendOptionsText(GetType());
     }
 
@@ -61,6 +59,7 @@ public sealed class EscapistRole(IntPtr cppPtr)
 
     public CustomRoleConfiguration Configuration => new(this)
     {
+        IconTmp = TmpSpriteUtils.CreateSpriteAsset(TouRoleIcons.Escapist.LoadAsset(), "TouMira.Role.Impostor.Escapist", 1.45f),
         Icon = TouRoleIcons.Escapist,
         IntroSound = TouAudio.TimeLordIntroSound,
         OptionsScreenshot = TouBanners.EscapistRoleBanner,
@@ -74,15 +73,15 @@ public sealed class EscapistRole(IntPtr cppPtr)
     {
         get
         {
-            return new List<CustomButtonWikiDescription>
-            {
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Mark", "Mark"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}MarkWikiDescription"),
+            return
+            [
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Mark", "Mark"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Mark.WikiDescription"),
                     TouImpAssets.MarkSprite),
-                new(TouLocale.GetParsed($"TouRole{LocaleKey}Recall", "Recall"),
-                    TouLocale.GetParsed($"TouRole{LocaleKey}RecallWikiDescription"),
+                new(MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Recall", "Recall"),
+                    MiraLocaleManager.Get($"TownOfUsMira.Role.{IdPart}Recall.WikiDescription"),
                     TouImpAssets.RecallSprite)
-            };
+            ];
         }
     }
 
@@ -90,7 +89,7 @@ public sealed class EscapistRole(IntPtr cppPtr)
     {
         RoleBehaviourStubs.Deinitialize(this, targetPlayer);
         TouRoleUtils.ClearTaskHeader(Player);
-        EscapeMark?.gameObject.Destroy();
+        EscapeMark?.gameObject.DeepDestroy();
     }
 
     [MethodRpc((uint)TownOfUsRpc.Recall)]

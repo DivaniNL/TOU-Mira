@@ -17,13 +17,13 @@ namespace TownOfUs.Modules.Components;
 [SuppressMessage("StyleCop.CSharp.MaintainabilityRules", "SA1401:Fields should be private", Justification = "Unity")]
 public sealed class AmbassadorConfirmMinigame(IntPtr cppPtr) : Minigame(cppPtr)
 {
-    public TextMeshPro? TitleText;
-    public SpriteRenderer? RoleIcon;
-    public TextMeshPro? RetrainText;
-    public GameObject? Divider;
-    public GameObject? Box;
-    public GameObject? DenyButton;
-    public GameObject? AcceptButton;
+    public TextMeshPro TitleText;
+    public SpriteRenderer RoleIcon;
+    public TextMeshPro RetrainText;
+    public GameObject Divider;
+    public GameObject Box;
+    public GameObject DenyButton;
+    public GameObject AcceptButton;
     private RoleBehaviour NewRole;
 
     private readonly Color _bgColor = new Color32(24, 0, 0, 215);
@@ -46,15 +46,13 @@ public sealed class AmbassadorConfirmMinigame(IntPtr cppPtr) : Minigame(cppPtr)
 
         TitleText.font = HudManager.Instance.TaskPanel.taskText.font;
         TitleText.fontMaterial = HudManager.Instance.TaskPanel.taskText.fontMaterial;
-        TitleText.text = "Ambassador Retrain";
+        TitleText.text = MiraLocaleManager.Get("TownOfUsMira.Role.AmbassadorRetrainTitle");
 
         RetrainText.font = HudManager.Instance.TaskPanel.taskText.font;
         RetrainText.fontMaterial = HudManager.Instance.TaskPanel.taskText.fontMaterial;
         RetrainText.text =
-            $"Are you sure you want to be retrained into {NewRole.GetRoleName()}?\nThis change is permanent.";
-
+        MiraLocaleManager.Get("TownOfUsMira.Role.AmbassadorRetrainConfirm").Replace("<role>", NewRole.GetRoleName());
         RoleIcon.sprite = NewRole.RoleIconWhite ?? TouRoleIcons.Impostor.LoadAsset();
-
         RoleIcon.SetSizeLimit(2.8f);
 
         TitleText.gameObject.SetActive(false);
@@ -86,7 +84,7 @@ public sealed class AmbassadorConfirmMinigame(IntPtr cppPtr) : Minigame(cppPtr)
 
     private static IEnumerator CoOpen(AmbassadorConfirmMinigame minigame)
     {
-        while (ExileController.Instance != null)
+        while (ExileController.Instance)
         {
             yield return new WaitForSeconds(0.65f);
         }
@@ -105,22 +103,22 @@ public sealed class AmbassadorConfirmMinigame(IntPtr cppPtr) : Minigame(cppPtr)
     {
         HudManager.Instance.StartCoroutine(HudManager.Instance.CoFadeFullScreen(Color.clear, _bgColor));
 
-        TitleText!.gameObject.SetActive(true);
-        RoleIcon!.gameObject.SetActive(true);
-        RetrainText!.gameObject.SetActive(true);
-        Divider!.SetActive(true);
-        Box!.SetActive(true);
-        DenyButton!.SetActive(true);
-        AcceptButton!.SetActive(true);
+        TitleText.gameObject.SetActive(true);
+        RoleIcon.gameObject.SetActive(true);
+        RetrainText.gameObject.SetActive(true);
+        Divider.SetActive(true);
+        Box.SetActive(true);
+        DenyButton.SetActive(true);
+        AcceptButton.SetActive(true);
 
-        DenyButton!.GetComponent<PassiveButton>().OnClick.RemoveAllListeners();
-        DenyButton!.GetComponent<PassiveButton>().OnClick.AddListener((UnityAction)(() =>
+        DenyButton.GetComponent<PassiveButton>().OnClick.RemoveAllListeners();
+        DenyButton.GetComponent<PassiveButton>().OnClick.AddListener((UnityAction)(() =>
         {
             clickHandler.Invoke(false);
         }));
 
-        AcceptButton!.GetComponent<PassiveButton>().OnClick.RemoveAllListeners();
-        AcceptButton!.GetComponent<PassiveButton>().OnClick.AddListener((UnityAction)(() =>
+        AcceptButton.GetComponent<PassiveButton>().OnClick.RemoveAllListeners();
+        AcceptButton.GetComponent<PassiveButton>().OnClick.AddListener((UnityAction)(() =>
         {
             clickHandler.Invoke(true);
         }));

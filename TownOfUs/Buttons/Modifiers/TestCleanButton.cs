@@ -3,7 +3,6 @@ using MiraAPI.Events;
 using MiraAPI.GameOptions;
 using MiraAPI.Modifiers;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities;
 using Reactor.Utilities.Extensions;
 using TownOfUs.Events.TouEvents;
@@ -18,7 +17,7 @@ namespace TownOfUs.Buttons.Modifiers;
 
 public sealed class TestCleanButton : TownOfUsTargetButton<DeadBody>
 {
-    public override string Name => TouLocale.GetParsed("TouRoleJanitorClean", "Clean");
+    public override string Name => MiraLocaleManager.Get("TownOfUsMira.Role.JanitorClean", "Clean");
     public override BaseKeybind Keybind => Keybinds.ModifierAction;
     public override Color TextOutlineColor => TownOfUsColors.Impostor;
     public override float Cooldown => 10f;
@@ -40,12 +39,12 @@ public sealed class TestCleanButton : TownOfUsTargetButton<DeadBody>
         }
 
         CleaningBody = Target;
-        OverrideName(TouLocale.Get("TouRoleJanitorCleaning", "Cleaning"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.JanitorCleaning", "Cleaning"));
     }
 
     public override void OnEffectEnd()
     {
-        OverrideName(TouLocale.GetParsed("TouRoleJanitorClean", "Clean"));
+        OverrideName(MiraLocaleManager.Get("TownOfUsMira.Role.JanitorClean", "Clean"));
         if (CleaningBody == Target && CleaningBody != null)
         {
             // Directly call the clean logic without role check (for testing modifier)
@@ -86,7 +85,7 @@ public sealed class TestCleanButton : TownOfUsTargetButton<DeadBody>
 
     public override bool Enabled(RoleBehaviour? role)
     {
-        return PlayerControl.LocalPlayer != null &&
+        return PlayerControl.LocalPlayer &&
                PlayerControl.LocalPlayer.HasModifier<TestCleanModifier>() &&
                !PlayerControl.LocalPlayer.Data.IsDead;
     }

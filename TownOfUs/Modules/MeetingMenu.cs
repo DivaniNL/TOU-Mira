@@ -1,6 +1,5 @@
 using HarmonyLib;
 using MiraAPI.Utilities;
-using MiraAPI.Utilities.Assets;
 using Reactor.Utilities.Extensions;
 using TMPro;
 using UnityEngine;
@@ -117,19 +116,19 @@ public sealed class MeetingMenu : IDisposable
 
     private void GenButton(PlayerVoteArea voteArea, MeetingHud __instance)
     {
-        Actives.Add(voteArea.TargetPlayerId, false);
+        Actives.Add(voteArea.PlayerId, false);
 
         if (IsExempt(voteArea))
         {
-            Buttons.Add(voteArea.TargetPlayerId, null!);
-            ButtonSprites.Add(voteArea.TargetPlayerId, null!);
+            Buttons.Add(voteArea.PlayerId, null!);
+            ButtonSprites.Add(voteArea.PlayerId, null!);
             return;
         }
 
         var targetBox = UObject.Instantiate(
             voteArea.Buttons.transform.Find("CancelButton").gameObject,
             voteArea.transform);
-        targetBox.name = $"MeetingButton{Owner.GetRoleName().Replace(" ", "")}{voteArea.TargetPlayerId}";
+        targetBox.name = $"MeetingButton{Owner.GetRoleName().Replace(" ", "")}{voteArea.PlayerId}";
         targetBox.transform.localPosition = Position;
         var renderer = targetBox.GetComponent<SpriteRenderer>();
         renderer.sprite = (Type == MeetingAbilityType.Toggle ? DisabledSprite : ActiveSprite).LoadAsset();
@@ -137,13 +136,13 @@ public sealed class MeetingMenu : IDisposable
         button.OverrideOnClickListeners(() => Click(voteArea, __instance));
         button.OverrideOnMouseOverListeners(() => renderer.color = HoverColor);
         button.OverrideOnMouseOutListeners(() => renderer.color =
-            Type == MeetingAbilityType.Toggle && Actives[voteArea.TargetPlayerId]
+            Type == MeetingAbilityType.Toggle && Actives[voteArea.PlayerId]
                 ? ActiveColor
                 : DisabledColor);
         var collider = targetBox.GetComponent<BoxCollider2D>();
         collider.size = renderer.sprite.bounds.size;
         collider.offset = Vector2.zero;
-        targetBox.transform.GetChild(0).gameObject.Destroy();
+        targetBox.transform.GetChild(0).gameObject.DeepDestroy();
 
         var buttonText = UObject.Instantiate(
             __instance.MeetingAbilityButton.buttonLabelText.gameObject,
@@ -157,12 +156,17 @@ public sealed class MeetingMenu : IDisposable
         tmpText.fontSizeMax = 2.5f;
         tmpText.fontSizeMin = 2.5f;
         tmpText.m_enableWordWrapping = false;
-        Buttons.Add(voteArea.TargetPlayerId, targetBox);
-        ButtonSprites.Add(voteArea.TargetPlayerId, renderer);
+        Buttons.Add(voteArea.PlayerId, targetBox);
+        ButtonSprites.Add(voteArea.PlayerId, renderer);
     }
 
     public void GenButtons(MeetingHud meeting, bool usable)
     {
+        if (meeting == null)
+        {
+            return;
+        }
+
         HideButtons();
 
         // Message($"MeetingMenu.GenButtons '{Owner.Player.Data.PlayerName}' AmOwner: {Owner.Player.AmOwner}");
